@@ -1206,11 +1206,23 @@ function fetchAllCampaignData(campaignResourceNames) {
   return campaignDataMap;
 }
 
+/**
+ * Decodes a Base64 encoded string into a regular string.
+ * @param {string} base64Data The Base64 encoded string.
+ * @return {string} The decoded string.
+ */
 function base64DecodeToString(base64Data) {
   const decoded = Utilities.base64Decode(base64Data);
   return Utilities.newBlob(decoded).getDataAsString();
 }
 
+/**
+ * Extracts the OCID and recommendation type ID from a recommendation resource name.
+ * The last segment of the resource name is a Base64 encoded string containing this info.
+ * @param {string} recommendationId The full resource name of the recommendation.
+ * @return {{ocid: string, recoTypeId: string}} An object with the OCID and
+ *     recommendation type ID.
+ */
 function getInfoFromRecoId(recommendationId) {
   const recoResourceSegments = recommendationId.split('/');
   const recommendationIdDecoded = base64DecodeToString(
