@@ -759,7 +759,7 @@ function fetchCampaignMetricsByDateRange(campaignResourceNames, dateCondition) {
               metrics.average_target_roas,
               metrics.average_target_cpa_micros,
               metrics.average_cpm,
-              metrics.average_cpv,
+              metrics.trueview_average_cpv,
               metrics.unique_users
             FROM campaign
             WHERE campaign.resource_name IN (${campaignIds})
@@ -778,7 +778,7 @@ function fetchCampaignMetricsByDateRange(campaignResourceNames, dateCondition) {
         avgTargetRoas: row.metrics.averageTargetRoas || 0,
         avgTargetCpa: fromMicros(row.metrics.averageTargetCpaMicros || 0),
         averageCpm: fromMicros(row.metrics.averageCpm || 0),
-        averageCpv: fromMicros(row.metrics.averageCpv || 0),
+        averageCpv: fromMicros(row.metrics.trueviewAverageCpv || 0),
         uniqueUsers: row.metrics.uniqueUsers || 0,
         roas: 0,
         cpa: 0,
@@ -1120,7 +1120,7 @@ function fetchAllCampaignData(campaignResourceNames) {
     campaignDetails.campaign30DaysRoas = metrics.roas;
     campaignDetails.campaign30DaysCpa = metrics.cpa;
     campaignDetails.campaign30DaysAvgCpm = metrics.averageCpm;
-    campaignDetails.campaign30DaysAvgCpv = metrics.averageCpv;
+    campaignDetails.campaign30DaysAvgCpv = metrics.trueviewAverageCpv;
     campaignDetails.campaign30DaysUniqueUsers = metrics.uniqueUsers;
     if (!campaignDetails.campaignIsPortfolioBiddingStrategy) {
       // Standard strategy
@@ -1156,7 +1156,7 @@ function fetchAllCampaignData(campaignResourceNames) {
     campaignDetails.campaignCustomRangeRoas = metrics.roas;
     campaignDetails.campaignCustomRangeCpa = metrics.cpa;
     campaignDetails.campaignCustomRangeAvgCpm = metrics.averageCpm;
-    campaignDetails.campaignCustomRangeAvgCpv = metrics.averageCpv;
+    campaignDetails.campaignCustomRangeAvgCpv = metrics.trueviewAverageCpv;
     campaignDetails.campaignCustomRangeUniqueUsers = metrics.uniqueUsers;
     if (!campaignDetails.campaignIsPortfolioBiddingStrategy) {
       // Standard strategy
