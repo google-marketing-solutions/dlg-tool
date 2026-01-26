@@ -467,6 +467,8 @@ function createReportRow(
   row.timestamp = new Date();
   row.recommendationId = recommendation.getResourceName();
   row.recommendationType = recommendation.getType();
+  const {ocid, recoTypeId} = getInfoFromRecoId(recommendation.getResourceName());
+  row.recommendationsDetailsUrl = `https://ads.google.com/aw/recommendations?ocid=${ocid}&opp=${recoTypeId}`;
   return row;
 }
 
@@ -1204,6 +1206,19 @@ function fetchAllCampaignData(campaignResourceNames) {
   return campaignDataMap;
 }
 
+function base64DecodeToString(base64Data) {
+  const decoded = Utilities.base64Decode(base64Data);
+  return Utilities.newBlob(decoded).getDataAsString();
+}
+
+function getInfoFromRecoId(recommendationId) {
+  const recoResourceSegments = recommendationId.split('/');
+  const recommendationIdDecoded = base64DecodeToString(
+    recoResourceSegments[recoResourceSegments.length - 1]);
+  const [ocid, recoTypeId, ...rest] = recommendationIdDecoded.split('-');
+  return {ocid, recoTypeId};
+}
+
 /**
  * Fetches the OCID (Operating Customer ID) for a given Google Ads account ID.
  * The OCID is extracted from the optimization score URL.
@@ -1286,7 +1301,8 @@ function processAccountRecommendations(account, counter, totalAccounts) {
     return processedRows;
   }
 
-  const ocid = getOcid(accountId).ocid;
+  // const ocid = getOcid(accountId).ocid;
+  const {ocid} = getInfoFromRecoId(recommendations[0].getResourceName());
 
   log(`Found ${
       recommendations.length} recommendations to process.`);
