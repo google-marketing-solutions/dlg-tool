@@ -382,6 +382,7 @@ const REPORT_SCHEMA_TEMPLATE = {
       {defaultValue: null, format: '0.00%'},
   campaign30DaysSearchBudgetLostImpressionShare:
       {defaultValue: null, format: '0.00%'},
+  campaign30DaysTargetChangesCount: {defaultValue: null, format: '#,##0'},
   campaignCustomRangeCost: {defaultValue: null, format: '#,##0.00'},
   campaignCustomRangeConversionsValue: {defaultValue: null, format: '#,##0.00'},
   campaignCustomRangeConversions: {defaultValue: null, format: '#,##0'},
@@ -442,6 +443,21 @@ const REPORT_SCHEMA_TEMPLATE = {
   moveBudgetSourceBudgetAmount: {defaultValue: 0, format: '#,##0.00'},
 };
 
+/**
+ * Safely retrieves a nested property from an object using a dot-separated
+ * string path.
+ *
+ * @param {?Object} obj The object to retrieve the property from.
+ * @param {string} desc A string representing the path to the nested
+ *     property (e.g., 'property.nestedProperty.deeplyNested').
+ * @return {*|undefined} The value of the nested property if it exists,
+ *     otherwise undefined.
+ */
+function getDescendantProp(obj, desc) {
+    const arr = desc.split('.');
+    while(arr.length && (obj = obj[arr.shift()]));
+    return obj;
+}
 
 /**
  * Creates a new, blank object for a report row.
@@ -1289,7 +1305,7 @@ function processAccountRecommendations(account, counter, totalAccounts) {
   const accountName = AdsApp.currentAccount().getName();
   const currencyCode = AdsApp.currentAccount().getCurrencyCode();
   log(progressBar(counter - 1, totalAccounts));
-  log(`Processing account ${counter} of ${
+  log(`Recommendations: Processing account ${counter} of ${
       totalAccounts}: ${accountId} (${accountName})`);
 
   const supportedTypes =
@@ -1511,7 +1527,7 @@ function processAccountRecommendations(account, counter, totalAccounts) {
           ((new Date().getTime() - processingStartTime) / 1000).toFixed(2)}s`,
       'timing');
 
-  log(`Total account processing time: ${
+  log(`Recommendations: Total account processing time: ${
           ((new Date().getTime() - accountStartTime) / 1000).toFixed(2)}s`,
       'timing');
   return processedRows;
@@ -1646,6 +1662,86 @@ function calculateAndWriteSummaryData(spreadsheet, reportData) {
       'timing');
 }
 
+function processAccountTargetChanges(account, counter, totalAccounts) {
+  const accountStartTime = new Date().getTime();
+  AdsManagerApp.select(account);
+  const accountId = AdsApp.currentAccount().getCustomerId();
+  const accountName = AdsApp.currentAccount().getName();
+
+  log(progressBar(counter - 1, totalAccounts));
+  log(`Target Changes: Processing account ${counter} of ${
+      totalAccounts}: ${accountId} (${accountName})`);
+
+  const MAX_CHANGE_EVENTS_COUNT = 10000;  // LIMIT statement required, max value is 10k
+  const DURATION_IN_DAYS = 29;  // query fails if going beyond 29 days back
+  const dt = new Date();
+  const tz = 'utc';
+  const endDate = Utilities.formatDate(dt, tz, 'yyyy-MM-dd');
+  dt.setDate(dt.getDate() - DURATION_IN_DAYS);
+  const startDate = Utilities.formatDate(dt, tz, 'yyyy-MM-dd');
+
+  const query = `
+        SELECT
+        campaign.id,
+        campaign.bidding_strategy_type,
+        change_event.resource_name,
+        change_event.change_date_time,
+        change_event.change_resource_name,
+        change_event.user_email,
+        change_event.client_type,
+        change_event.old_resource,
+        change_event.new_resource,
+        change_event.resource_change_operation,
+        change_event.campaign,
+        change_event.change_resource_type,
+        change_event.changed_fields
+      FROM change_event
+      WHERE change_event.change_date_time >= '${startDate}'
+        AND change_event.change_date_time < '${endDate}'
+        AND change_event.resource_change_operation = 'UPDATE'
+        AND change_event.change_resource_type = 'CAMPAIGN'
+      LIMIT ${MAX_CHANGE_EVENTS_COUNT}`;
+
+  const results = [];
+  try {
+    const result = AdsApp.search(query);
+    for (const row of result) {
+      const {campaign, changeEvent} = row;
+      const fieldName = changeEvent.changedFields.split(',').find(field => field.match(/target(?:roas|cpa)/i));
+      if (!fieldName) {
+        continue;
+      }
+
+      const oldTargetMicros = getDescendantProp(changeEvent.oldResource, `campaign.${fieldName}`);
+      const newTargetMicros = getDescendantProp(changeEvent.newResource, `campaign.${fieldName}`);
+
+      results.push({
+        accountId: accountId,
+        accountName: accountName,
+        campaignId: campaign.id,
+        biddingStrategyType: campaign.biddingStrategyType,
+        eventDateTime: changeEvent.changeDateTime,
+        user: changeEvent.userEmail,
+        clientType: changeEvent.clientType,
+        resourceType: changeEvent.changeResourceType,
+        resourceName: changeEvent.changeResourceName,
+        fieldName,
+        operation: changeEvent.resourceChangeOperation,
+        oldTarget: oldTargetMicros ? oldTargetMicros/1e6 : null,
+        newTarget: newTargetMicros ? newTargetMicros/1e6 : null,
+      });
+    }
+
+  } catch (e) {
+    log(`Could not fetch change events details. Error: ${e.message}`);
+  }
+
+  log(`Target Changes: Total account processing time: ${
+        ((new Date().getTime() - accountStartTime) / 1000).toFixed(2)}s`,
+    'timing');
+
+  return results;
+}
 
 /**
  * Loads a configuration object from the spreadsheet.
@@ -1769,7 +1865,8 @@ function sendSetupEmail(sheetUrl, reportName, accountName, recipientEmail) {
   // 2. Define datasources (Sheet Name -> DS Alias)
   const sheetDefinitions = {
     'Data': 'data_sheet',
-    'Summary': 'summary_sheet'
+    'Summary': 'summary_sheet',
+    'TargetChangeEvents': 'target_change_events_sheet',
   };
 
   // 3. Build params for each sheet
@@ -1997,6 +2094,34 @@ function enrichWithMccPortfolioMetrics(
 
 
 /**
+ * Enriches recommendation data with the count of target changes within the last 30 days.
+ *
+ * This function takes an array of recommendation objects and an array of target change
+ * events. It counts the number of target changes for each campaign and adds this count
+ * as a new property (`campaign30DaysTargetChangesCount`) to each corresponding
+ * recommendation object.
+ *
+ * @param {!Array<!Object>} recommendations An array of recommendation data objects, each expected to have a `campaignId` property.
+ * @param {!Array<!Object>} targetChanges An array of target change event objects, each also expected to have a `campaignId` property.
+ * @return {!Array<!Object>} The enriched array of recommendation objects, now including the `campaign30DaysTargetChangesCount` property.
+ */
+function enrichWithTargetChanges(recommendations, targetChanges) {
+  const targetChangesCounts = new Map();
+  for (const targetChange of targetChanges) {
+    const campaignId = targetChange.campaignId;
+    const count = targetChangesCounts.get(campaignId) || 0;
+    targetChangesCounts.set(campaignId, count + 1);
+  }
+
+  for (const row of recommendations) {
+    const campaignId = row.campaignId;
+    // technically last 29 days due to API limitation, but oh well...
+    row.campaign30DaysTargetChangesCount = targetChangesCounts.get(campaignId) || 0;
+  }
+  return recommendations;
+}
+
+/**
  * Entry point to execute the script.
  */
 function main() {
@@ -2040,6 +2165,8 @@ function main() {
   const internalIdToAccountMap = buildInternalIdToAccountMap(topLevelAccount);
 
   let recommendations = [];
+  let targetChanges = [];
+
   let counter = 1;
   while (accountIterator.hasNext()) {
     const account = accountIterator.next();
@@ -2047,6 +2174,9 @@ function main() {
       recommendations.push.apply(
           recommendations,
           processAccountRecommendations(account, counter, totalAccounts));
+      targetChanges.push.apply(
+        targetChanges,
+        processAccountTargetChanges(account, counter, totalAccounts));
     } catch (e) {
       log(`Could not process account ${account.getCustomerId()}: ${e.message}`);
     }
@@ -2059,7 +2189,10 @@ function main() {
       recommendations, internalIdToAccountMap, topLevelAccount,
       formattedStartDate, formattedEndDate);
 
+  recommendations = enrichWithTargetChanges(recommendations, targetChanges);
+
   writeDataToSheet(spreadsheet, 'Data', recommendations);
+  writeDataToSheet(spreadsheet, 'TargetChangeEvents', targetChanges);
   calculateAndWriteSummaryData(spreadsheet, recommendations);
 
   // 4. Send Setup Email
