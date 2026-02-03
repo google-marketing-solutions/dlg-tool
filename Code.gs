@@ -10,14 +10,14 @@ CONFIG = {
   'LOOKER_TEMPLATE_ID': '0c3f445f-ae15-471c-a850-cfc1aaf53b83',
 
   // Set to true to see detailed logs, false for production.
-  'debug_mode': false,
-  
+  'debug_logs': false,
+
   // Set to true to see key timing details for API calls and processing.
   'show_timings_in_logs': true,
-  
+
   // Set to true to see verbose timing details for debugging.
   'show_verbose_timings_in_logs': false,
-  
+
   // Set to true to always send the setup email, even if the sheet already exists.
   'force_setup_email': false,
 
@@ -50,7 +50,7 @@ function fromMicros(micros) {
  * 'verbose_timing'.
  */
 function log(message, type = 'normal') {
-  if (type === 'debug' && !CONFIG.debug_mode) {
+  if (type === 'debug' && !CONFIG.debug_logs) {
     return;
   }
   if (type === 'timing' && !CONFIG.show_timings_in_logs) {
@@ -254,6 +254,86 @@ const RECOMMENDATION_HANDLERS = {
       }
       return [];
     }
+  },
+  'RAISE_TARGET_CPA': {
+    /**
+     * Extracts the recommendation target entities (campaigns) from the
+     * recommendation.
+     * @param {!Object} recommendation The recommendation object.
+     * @param {!Object} recommendationDetails The pre-fetched details for this
+     *     recommendation.
+     * @return {!Array<!Object>} An array of recommendation target objects.
+     */
+    getRecommendationTargets: function(recommendation, recommendationDetails) {
+      if (recommendationDetails.campaigns &&
+          recommendationDetails.campaigns.length > 0) {
+        return recommendationDetails.campaigns.map(
+            name => ({campaignResourceName: name}));
+      } else if (recommendationDetails.campaign) {
+        return [{campaignResourceName: recommendationDetails.campaign}];
+      }
+      return [];
+    },
+    addSpecificDetails: function(
+        rowData, recommendationTarget, recommendation, recommendationDetails) {
+      const cpaRec = recommendationDetails.raiseTargetCpaRecommendation?.targetAdjustment;
+      if (cpaRec) {
+        const currentTargetMicros = cpaRec.currentAverageTargetMicros;
+        const recommendedMultiplier = cpaRec.recommendedTargetMultiplier;
+        const recommendedTargetMicros = currentTargetMicros * recommendedMultiplier;
+        rowData.recommendationNewTargetCpa = fromMicros(recommendedTargetMicros);
+      }
+      return rowData;
+    },
+    getImpactStats: function(recommendation, recommendationDetails) {
+      const cpaImpact = recommendationDetails.impact;
+      if (cpaImpact) {
+        return {
+          baseMetrics: cpaImpact.baseMetrics,
+          potentialMetrics: cpaImpact.potentialMetrics,
+        };
+      }
+      return {baseMetrics: null, potentialMetrics: null};
+    },
+    getRequiredBudgetResourceNames: function(recommendationDetails) {
+      return [];
+    }
+  },
+  'LOWER_TARGET_ROAS': {
+    getRecommendationTargets: function(recommendation, recommendationDetails) {
+      if (recommendationDetails.campaigns &&
+          recommendationDetails.campaigns.length > 0) {
+        return recommendationDetails.campaigns.map(
+            name => ({campaignResourceName: name}));
+      } else if (recommendationDetails.campaign) {
+        return [{campaignResourceName: recommendationDetails.campaign}];
+      }
+      return [];
+    },
+    addSpecificDetails: function(
+        rowData, recommendationTarget, recommendation, recommendationDetails) {
+      const roasRec = recommendationDetails.lowerTargetRoasRecommendation?.targetAdjustment;
+      if (roasRec) {
+        const currentTargetMicros = roasRec.currentAverageTargetMicros;
+        const recommendedMultiplier = roasRec.recommendedTargetMultiplier;
+        const recommendedTargetMicros = currentTargetMicros * recommendedMultiplier;
+        rowData.recommendationNewTargetRoas = fromMicros(recommendedTargetMicros);
+      }
+      return rowData;
+    },
+    getImpactStats: function(recommendation, recommendationDetails) {
+      const roasImpact = recommendationDetails.impact;
+      if (roasImpact) {
+        return {
+          baseMetrics: roasImpact.baseMetrics,
+          potentialMetrics: roasImpact.potentialMetrics,
+        };
+      }
+      return {baseMetrics: null, potentialMetrics: null};
+    },
+    getRequiredBudgetResourceNames: function(recommendationDetails) {
+      return [];
+    }
   }
 };
 
@@ -262,9 +342,10 @@ const REPORT_SCHEMA_TEMPLATE = {
   // --- Basic Info (Should be always available) ---
   accountId: {defaultValue: 'N/A', format: '@'},
   accountName: {defaultValue: 'N/A', format: '@'},
-  timestamp: {defaultValue: null, format: 'yyyy-mm-dd HH:mi:ss'},
+  timestamp: {defaultValue: null, format: 'yyyy-mm-dd hh:mm:ss'},
   recommendationId: {defaultValue: 'N/A', format: '@'},
   recommendationType: {defaultValue: 'N/A', format: '@'},
+  recommendationsDetailsUrl: {defaultValue: 'N/A', format: '@'},
   // --- Default values for all other fields ---
   campaignUrl: {defaultValue: 'N/A', format: '@'},
   campaignId: {defaultValue: 'N/A', format: '@'},
@@ -272,6 +353,8 @@ const REPORT_SCHEMA_TEMPLATE = {
   campaignType: {defaultValue: 'N/A', format: '@'},
   campaignSubType: {defaultValue: 'N/A', format: '@'},
   campaignIsAiMax: {defaultValue: false, format: '@'},
+  campaignAiMaxTextCustomizationEnabled: {defaultValue: false, format: '@'},
+  campaignAiMaxFinalUrlExpansionEnabled: {defaultValue: false, format: '@'},
   currencyCode: {defaultValue: 'N/A', format: '@'},
   campaignBudgetName: {defaultValue: 'N/A', format: '@'},
   campaignBudgetAmount: {defaultValue: null, format: '#,##0.00'},
@@ -319,12 +402,20 @@ const REPORT_SCHEMA_TEMPLATE = {
       {defaultValue: null, format: '0.00%'},
   recommendationCurrentBudgetAmount: {defaultValue: null, format: '#,##0.00'},
   recommendationNewBudgetAmount: {defaultValue: null, format: '#,##0.00'},
+  recommendationNewTargetCpa: {defaultValue: null, format: '#,##0.00'},
+  recommendationNewTargetRoas: {defaultValue: null, format: '0.00'},
   recommendationBaseCost: {defaultValue: null, format: '#,##0.00'},
   recommendationPotentialCost: {defaultValue: null, format: '#,##0.00'},
   recommendationBaseClicks: {defaultValue: null, format: '#,##0'},
   recommendationPotentialClicks: {defaultValue: null, format: '#,##0'},
   recommendationBaseConversions: {defaultValue: null, format: '#,##0'},
   recommendationPotentialConversions: {defaultValue: null, format: '#,##0'},
+  recommendationBaseConversionsValue: {defaultValue: null, format: '#,##0'},
+  recommendationPotentialConversionsValue: {defaultValue: null, format: '#,##0'},
+  recommendationBaseCpa: {defaultValue: null, format: '#,##0.00'},
+  recommendationPotentialCpa: {defaultValue: null, format: '#,##0.00'},
+  recommendationBaseRoas: {defaultValue: null, format: '0.00'},
+  recommendationPotentialRoas: {defaultValue: null, format: '0.00'},
   recommendationBaseImpressions: {defaultValue: null, format: '#,##0'},
   recommendationPotentialImpressions: {defaultValue: null, format: '#,##0'},
   recommendationBaseVideoViews: {defaultValue: null, format: '#,##0'},
@@ -341,6 +432,8 @@ const REPORT_SCHEMA_TEMPLATE = {
   dailyBudgetDelta: {defaultValue: null, format: '#,##0.00'},
   targetRoasDelta: {defaultValue: null, format: '0.00'},
   targetCpaDelta: {defaultValue: null, format: '#,##0.00'},
+  recommendationCpaDelta: {defaultValue: null, format: '#,##0.00'},
+  recommendationRoasDelta: {defaultValue: null, format: '0.00'},
   // --- Fields for MOVE_UNUSED_BUDGET recommendations ---
   moveBudgetAmount: {defaultValue: 0, format: '#,##0.00'},
   moveBudgetSourceCampaigns: {defaultValue: 'N/A', format: '@'},
@@ -376,6 +469,8 @@ function createReportRow(
   row.timestamp = new Date();
   row.recommendationId = recommendation.getResourceName();
   row.recommendationType = recommendation.getType();
+  const {ocid, recoTypeId} = getInfoFromRecoId(recommendation.getResourceName());
+  row.recommendationsDetailsUrl = `https://ads.google.com/aw/recommendations?ocid=${ocid}&opp=${recoTypeId}`;
   return row;
 }
 
@@ -401,7 +496,10 @@ function fetchAllRecommendationDetails(recommendations) {
         recommendation.campaign,
         recommendation.campaigns,
         recommendation.campaign_budget_recommendation,
-        recommendation.move_unused_budget_recommendation
+        recommendation.move_unused_budget_recommendation,
+        recommendation.raise_target_cpa_recommendation,
+        recommendation.lower_target_roas_recommendation,
+        recommendation.impact
       FROM recommendation
       WHERE recommendation.resource_name IN (${recommendationIds})`;
 
@@ -539,16 +637,22 @@ function extractBudgetDetails(campaignBudget) {
 function extractRecommendationImpactStats(impactMetrics) {
   const startTime = new Date().getTime();
   const details = {
-    recommendationBaseCost: 'N/A',
-    recommendationPotentialCost: 'N/A',
-    recommendationBaseClicks: 'N/A',
-    recommendationPotentialClicks: 'N/A',
-    recommendationBaseConversions: 'N/A',
-    recommendationPotentialConversions: 'N/A',
-    recommendationBaseImpressions: 'N/A',
-    recommendationPotentialImpressions: 'N/A',
-    recommendationBaseVideoViews: 'N/A',
-    recommendationPotentialVideoViews: 'N/A',
+    recommendationBaseCost: null,
+    recommendationPotentialCost: null,
+    recommendationBaseClicks: null,
+    recommendationPotentialClicks: null,
+    recommendationBaseConversions: null,
+    recommendationPotentialConversions: null,
+    recommendationBaseImpressions: null,
+    recommendationPotentialImpressions: null,
+    recommendationBaseVideoViews: null,
+    recommendationPotentialVideoViews: null,
+    recommendationBaseConversionsValue: null,
+    recommendationPotentialConversionsValue: null,
+    recommendationBaseCpa: null,
+    recommendationPotentialCpa: null,
+    recommendationBaseRoas: null,
+    recommendationPotentialRoas: null,
   };
 
   try {
@@ -566,6 +670,12 @@ function extractRecommendationImpactStats(impactMetrics) {
       details.recommendationPotentialImpressions = potentialMetrics.impressions;
       details.recommendationBaseVideoViews = baseMetrics.videoViews;
       details.recommendationPotentialVideoViews = potentialMetrics.videoViews;
+      details.recommendationBaseConversionsValue = baseMetrics.conversionsValue;
+      details.recommendationPotentialConversionsValue = potentialMetrics.conversionsValue;
+      details.recommendationBaseCpa = details.recommendationBaseConversions > 0 ? details.recommendationBaseCost / details.recommendationBaseConversions : 0;
+      details.recommendationPotentialCpa = details.recommendationPotentialConversions > 0 ? details.recommendationPotentialCost / details.recommendationPotentialConversions : 0;
+      details.recommendationBaseRoas = details.recommendationBaseCost > 0 ? details.recommendationBaseConversionsValue / details.recommendationBaseCost : 0;
+      details.recommendationPotentialRoas = details.recommendationPotentialCost > 0 ? details.recommendationPotentialConversionsValue / details.recommendationPotentialCost : 0;
     }
   } catch (e) {
     log(`Could not extract base/potential stats. Error: ${e.message}`);
@@ -653,7 +763,7 @@ function fetchCampaignMetricsByDateRange(campaignResourceNames, dateCondition) {
               metrics.average_target_roas,
               metrics.average_target_cpa_micros,
               metrics.average_cpm,
-              metrics.average_cpv,
+              metrics.trueview_average_cpv,
               metrics.unique_users
             FROM campaign
             WHERE campaign.resource_name IN (${campaignIds})
@@ -672,7 +782,7 @@ function fetchCampaignMetricsByDateRange(campaignResourceNames, dateCondition) {
         avgTargetRoas: row.metrics.averageTargetRoas || 0,
         avgTargetCpa: fromMicros(row.metrics.averageTargetCpaMicros || 0),
         averageCpm: fromMicros(row.metrics.averageCpm || 0),
-        averageCpv: fromMicros(row.metrics.averageCpv || 0),
+        averageCpv: fromMicros(row.metrics.trueviewAverageCpv || 0),
         uniqueUsers: row.metrics.uniqueUsers || 0,
         roas: 0,
         cpa: 0,
@@ -784,6 +894,8 @@ function fetchAllCampaignData(campaignResourceNames) {
       campaignType: 'N/A',
       campaignSubType: 'N/A',
       campaignIsAiMax: false,
+      campaignAiMaxTextCustomizationEnabled: false,
+      campaignAiMaxFinalUrlExpansionEnabled: false,
       campaignBudgetAmount: null,
       campaignBudgetTotalAmount: null,
       campaignBudgetDeliveryMethod: 'N/A',
@@ -839,6 +951,7 @@ function fetchAllCampaignData(campaignResourceNames) {
           campaign.advertising_channel_type,
           campaign.advertising_channel_sub_type,
           campaign.ai_max_setting.enable_ai_max,
+          campaign.asset_automation_settings,
           campaign.bidding_strategy_type,
           campaign.bidding_strategy,
           campaign.maximize_conversions.target_cpa_micros,
@@ -876,6 +989,27 @@ function fetchAllCampaignData(campaignResourceNames) {
       campaignDetails.campaignSubType = row.campaign.advertisingChannelSubType;
       campaignDetails.campaignIsAiMax =
           row.campaign.aiMaxSetting?.enableAiMax || false;
+
+      // Extract Asset Automation Settings
+      const rawSettings = row.campaign.assetAutomationSettings || [];
+      let settings = [];
+      if (Array.isArray(rawSettings)) {
+        settings = rawSettings;
+      } else if (typeof rawSettings === 'object' && rawSettings !== null) {
+        settings = Object.values(rawSettings);
+      }
+      for (const setting of settings) {
+        const type = setting.assetAutomationType;
+        const status = setting.assetAutomationStatus;
+        if (type === 'TEXT_ASSET_AUTOMATION') {
+          campaignDetails.campaignAiMaxTextCustomizationEnabled =
+              status === 'OPTED_IN';
+        } else if (type === 'FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION') {
+          campaignDetails.campaignAiMaxFinalUrlExpansionEnabled =
+              status === 'OPTED_IN';
+        }
+      }
+
       campaignDetails.campaignBiddingStrategyType =
           row.campaign.biddingStrategyType;
 
@@ -1014,7 +1148,7 @@ function fetchAllCampaignData(campaignResourceNames) {
     campaignDetails.campaign30DaysRoas = metrics.roas;
     campaignDetails.campaign30DaysCpa = metrics.cpa;
     campaignDetails.campaign30DaysAvgCpm = metrics.averageCpm;
-    campaignDetails.campaign30DaysAvgCpv = metrics.averageCpv;
+    campaignDetails.campaign30DaysAvgCpv = metrics.trueviewAverageCpv;
     campaignDetails.campaign30DaysUniqueUsers = metrics.uniqueUsers;
     if (!campaignDetails.campaignIsPortfolioBiddingStrategy) {
       // Standard strategy
@@ -1050,7 +1184,7 @@ function fetchAllCampaignData(campaignResourceNames) {
     campaignDetails.campaignCustomRangeRoas = metrics.roas;
     campaignDetails.campaignCustomRangeCpa = metrics.cpa;
     campaignDetails.campaignCustomRangeAvgCpm = metrics.averageCpm;
-    campaignDetails.campaignCustomRangeAvgCpv = metrics.averageCpv;
+    campaignDetails.campaignCustomRangeAvgCpv = metrics.trueviewAverageCpv;
     campaignDetails.campaignCustomRangeUniqueUsers = metrics.uniqueUsers;
     if (!campaignDetails.campaignIsPortfolioBiddingStrategy) {
       // Standard strategy
@@ -1096,6 +1230,31 @@ function fetchAllCampaignData(campaignResourceNames) {
   log(`fetchAllCampaignData took ${((new Date().getTime() - startTime) / 1000).toFixed(2)}s`,
       'verbose_timing');
   return campaignDataMap;
+}
+
+/**
+ * Decodes a Base64 encoded string into a regular string.
+ * @param {string} base64Data The Base64 encoded string.
+ * @return {string} The decoded string.
+ */
+function base64DecodeToString(base64Data) {
+  const decoded = Utilities.base64Decode(base64Data);
+  return Utilities.newBlob(decoded).getDataAsString();
+}
+
+/**
+ * Extracts the OCID and recommendation type ID from a recommendation resource name.
+ * The last segment of the resource name is a Base64 encoded string containing this info.
+ * @param {string} recommendationId The full resource name of the recommendation.
+ * @return {{ocid: string, recoTypeId: string}} An object with the OCID and
+ *     recommendation type ID.
+ */
+function getInfoFromRecoId(recommendationId) {
+  const recoResourceSegments = recommendationId.split('/');
+  const recommendationIdDecoded = base64DecodeToString(
+    recoResourceSegments[recoResourceSegments.length - 1]);
+  const [ocid, recoTypeId, ...rest] = recommendationIdDecoded.split('-');
+  return {ocid, recoTypeId};
 }
 
 /**
@@ -1180,7 +1339,8 @@ function processAccountRecommendations(account, counter, totalAccounts) {
     return processedRows;
   }
 
-  const ocid = getOcid(accountId).ocid;
+  // const ocid = getOcid(accountId).ocid;
+  const {ocid} = getInfoFromRecoId(recommendations[0].getResourceName());
 
   log(`Found ${
       recommendations.length} recommendations to process.`);
@@ -1348,6 +1508,11 @@ function processAccountRecommendations(account, counter, totalAccounts) {
       rowData.targetCpaDelta = calculateDelta(
           rowData.campaign30DaysCpa, rowData.campaignBiddingTargetCpa);
 
+      rowData.recommendationCpaDelta = calculateDelta(
+        rowData.recommendationBaseCpa, rowData.recommendationPotentialCpa);
+      recommendationRoasDelta = calculateDelta(
+        rowData.recommendationBaseRoas, rowData.recommendationPotentialRoas);
+
       log(`Final calculations took ${
               ((new Date().getTime() - calculationsStartTime) / 1000)
                   .toFixed(2)}s`,
@@ -1445,8 +1610,15 @@ function writeDataToSheet(spreadsheet, sheetName, reportData) {
         const format = REPORT_SCHEMA_TEMPLATE[header].format;
         // Apply format to the entire column, starting from the second row
         const columnRange = sheet.getRange(2, i + 1, sheet.getMaxRows() - 1);
-        columnRange.setNumberFormat(format);
-        log(`  - Column '${header}' formatted as '${format}'.`, 'debug');
+        try {
+          columnRange.setNumberFormat(format);
+          if (header === 'campaign30DaysAvgTargetCpa') {
+             log(`*** DEBUG: Explicitly formatted 'campaign30DaysAvgTargetCpa' (Col ${i+1}) with format: '${format}' ***`, 'debug');
+          }
+          log(`  - Column '${header}' formatted as '${format}'.`, 'debug');
+        } catch (e) {
+          log(`  - WARNING: Failed to format column '${header}' with format '${format}'. Error: ${e.message}`);
+        }
       }
     }
     log('Column formatting applied.');
@@ -1571,7 +1743,7 @@ function createOrGetSpreadsheet(reportName) {
       return { spreadsheet: ss, isNew: false };
     } catch (e) {
       log(`Error accessing stored spreadsheet: ${storedUrl}. Error: ${e.message}`);
-      
+
       if (!CONFIG.force_new_sheet_on_access_error) {
         // Attempt to identify the current user to give a helpful error message
         let currentUser = "the current script runner";
@@ -1592,7 +1764,7 @@ function createOrGetSpreadsheet(reportName) {
                     `--------------------------------------------------------------------------------`;
         throw new Error(msg);
       }
-      
+
       log(`Proceeding to create a new spreadsheet because CONFIG.force_new_sheet_on_access_error is true.`);
     }
   }
@@ -1618,7 +1790,7 @@ function sendSetupEmail(sheetUrl, reportName, accountName, recipientEmail) {
 
   const ss = SpreadsheetApp.openByUrl(sheetUrl);
   const spreadsheetId = ss.getId();
-   
+
   // Logic adapted from provided snippet to handle specific aliases
   const baseUrl = "https://lookerstudio.google.com/reporting/create";
   const params = [];
@@ -1644,33 +1816,33 @@ function sendSetupEmail(sheetUrl, reportName, accountName, recipientEmail) {
       params.push(`${prefix}.worksheetId=${sheet.getSheetId()}`);
     }
   });
-   
+
   const lookerStudioLink = `${baseUrl}?${params.join('&')}`;
 
   const subject = `${accountName} - Your Budget Report Data is Ready for Setup`;
-   
+
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
       <h2 style="color: #4285f4;">Your Budget Report Data is Ready</h2>
       <p>Hi there,</p>
       <p>Your Google Ads budget data for account <strong>${accountName}</strong> has been successfully exported to Google Sheets.</p>
-       
+
       <p>To finalize your report, click the button below. It will open Looker Studio with your data already connected and named correctly.</p>
-       
+
       <p>Only do this <b>once</b>, otherwise you will end up with duplicate reports.</p>
-       
+
       <br>
       <a href="${lookerStudioLink}" style="background-color: #4285f4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
         CREATE REPORT IN LOOKER STUDIO
       </a>
-       
-      <br>      
+
+      <br>
       <br>
       <p>Once your Looker report is set up, the contents will update automatically each time the Google Ads script runs.</p>
       <br>
 
       <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-       
+
       <p style="font-size: 12px; color: #666;">
         <strong>Reference:</strong><br>
         <a href="${sheetUrl}" style="color: #666;">Open Google Sheet Source</a>
@@ -1686,7 +1858,7 @@ function sendSetupEmail(sheetUrl, reportName, accountName, recipientEmail) {
     subject: subject,
     htmlBody: htmlBody
   });
-   
+
   log(`Email sent to ${recipientEmail}`);
 }
 
@@ -1866,10 +2038,10 @@ function main() {
   // 1. Get Account Details
   const topLevelAccount = AdsApp.currentAccount();  // The MCC running the script
   const accountName = topLevelAccount.getName();
-   
+
   // Construct the dynamic Report Name: "[MCC Account name] Budget Recommendation Report"
   const DYNAMIC_REPORT_NAME = `[${accountName}] - Budget Recommendation Report`;
-   
+
   log(`Processing Account: ${accountName}`);
 
   // 2. Create or Get Spreadsheet
@@ -1877,7 +2049,7 @@ function main() {
   const spreadsheet = sheetResult.spreadsheet;
   const isNewSheet = sheetResult.isNew;
   const spreadsheetUrl = spreadsheet.getUrl();
-   
+
   const mccAccountTimeZone = topLevelAccount.getTimeZone();
 
   // Calculate dates early
@@ -1902,9 +2074,8 @@ function main() {
 
   let recommendations = [];
   let counter = 1;
-  const clientAccountIterator = AdsManagerApp.accounts().get();
-  while (clientAccountIterator.hasNext()) {
-    const account = clientAccountIterator.next();
+  while (accountIterator.hasNext()) {
+    const account = accountIterator.next();
     try {
       recommendations.push.apply(
           recommendations,
@@ -1927,7 +2098,7 @@ function main() {
   // 4. Send Setup Email
   if (isNewSheet || CONFIG.force_setup_email) {
     let effectiveUserEmail = null;
-    
+
     // If the sheet is brand new, the runner IS the owner.
     // If the sheet already exists but we are forcing an email, we verify identity via temp file
     // because the sheet owner might be someone else (e.g. the original creator).
@@ -1943,7 +2114,7 @@ function main() {
 
     sendSetupEmail(spreadsheetUrl, DYNAMIC_REPORT_NAME, accountName, effectiveUserEmail);
   } else {
-    log("Spreadsheet already exists. Skipping setup email to avoid spam.");
+    log("Spreadsheet already exists, skipping setup email.");
   }
 
   const scriptEndTime = new Date().getTime();
