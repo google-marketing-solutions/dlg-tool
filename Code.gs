@@ -1777,10 +1777,18 @@ function writeDataToSheet(spreadsheet, sheetName, reportData, schemaTemplate) {
     }
   }
 
-  if (reportData && reportData.length > 0) {
-    sheet.clear();
+  // Always clear the sheet to prevent stale data from lingering.
+  sheet.clear();
 
-    const headers = Object.keys(reportData[0]);
+  let headers = [];
+  if (reportData && reportData.length > 0) {
+    headers = Object.keys(reportData[0]);
+  } else if (schemaTemplate) {
+    // If no data but schema exists, use schema keys as headers.
+    headers = Object.keys(schemaTemplate);
+  }
+
+  if (headers.length > 0) {
     const dataRows = [headers];
 
     // 1. Insert the Schema Dummy Row if a schema template is provided
@@ -1790,10 +1798,12 @@ function writeDataToSheet(spreadsheet, sheetName, reportData, schemaTemplate) {
       dataRows.push(dummyRowArray);
     }
 
-    // 2. Transform and push actual data
-    for (let i = 0; i < reportData.length; i++) {
-      const row = headers.map(header => reportData[i][header]);
-      dataRows.push(row);
+    // 2. Transform and push actual data (if any)
+    if (reportData && reportData.length > 0) {
+      for (let i = 0; i < reportData.length; i++) {
+        const row = headers.map(header => reportData[i][header]);
+        dataRows.push(row);
+      }
     }
 
     const numRows = dataRows.length;
@@ -1818,7 +1828,7 @@ function writeDataToSheet(spreadsheet, sheetName, reportData, schemaTemplate) {
       }
     }
   } else {
-    log(`No data rows to write to sheet "${sheetName}".`);
+    log(`No data and no schema to write to sheet "${sheetName}". Sheet cleared.`);
   }
 }
 
