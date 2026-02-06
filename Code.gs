@@ -10,7 +10,7 @@ CONFIG = {
   'LOOKER_TEMPLATE_ID': '0c3f445f-ae15-471c-a850-cfc1aaf53b83',
 
   // Set to true to see detailed logs, false for production.
-  'debug_mode': false,
+  'debug_logs': false,
 
   // Set to true to see key timing details for API calls and processing.
   'show_timings_in_logs': true,
@@ -50,7 +50,7 @@ function fromMicros(micros) {
  * 'verbose_timing'.
  */
 function log(message, type = 'normal') {
-  if (type === 'debug' && !CONFIG.debug_mode) {
+  if (type === 'debug' && !CONFIG.debug_logs) {
     return;
   }
   if (type === 'timing' && !CONFIG.show_timings_in_logs) {
@@ -281,7 +281,7 @@ const RECOMMENDATION_HANDLERS = {
         const currentTargetMicros = cpaRec.currentAverageTargetMicros;
         const recommendedMultiplier = cpaRec.recommendedTargetMultiplier;
         const recommendedTargetMicros = currentTargetMicros * recommendedMultiplier;
-        rowData.recommendationNewTargetCpa = fromMicros(recommendedTargetMicros)
+        rowData.recommendationNewTargetCpa = fromMicros(recommendedTargetMicros);
       }
       return rowData;
     },
@@ -317,7 +317,7 @@ const RECOMMENDATION_HANDLERS = {
         const currentTargetMicros = roasRec.currentAverageTargetMicros;
         const recommendedMultiplier = roasRec.recommendedTargetMultiplier;
         const recommendedTargetMicros = currentTargetMicros * recommendedMultiplier;
-        rowData.recommendationNewTargetRoas = fromMicros(recommendedTargetMicros)
+        rowData.recommendationNewTargetRoas = fromMicros(recommendedTargetMicros);
       }
       return rowData;
     },
@@ -342,7 +342,7 @@ const REPORT_SCHEMA_TEMPLATE = {
   // --- Basic Info (Should be always available) ---
   accountId: {defaultValue: 'N/A', format: '@'},
   accountName: {defaultValue: 'N/A', format: '@'},
-  timestamp: {defaultValue: null, format: 'yyyy-mm-dd HH:mi:ss'},
+  timestamp: {defaultValue: null, format: 'yyyy-mm-dd hh:mm:ss'},
   recommendationId: {defaultValue: 'N/A', format: '@'},
   recommendationType: {defaultValue: 'N/A', format: '@'},
   recommendationsDetailsUrl: {defaultValue: 'N/A', format: '@'},
@@ -353,6 +353,8 @@ const REPORT_SCHEMA_TEMPLATE = {
   campaignType: {defaultValue: 'N/A', format: '@'},
   campaignSubType: {defaultValue: 'N/A', format: '@'},
   campaignIsAiMax: {defaultValue: false, format: '@'},
+  campaignAiMaxTextCustomizationEnabled: {defaultValue: false, format: '@'},
+  campaignAiMaxFinalUrlExpansionEnabled: {defaultValue: false, format: '@'},
   currencyCode: {defaultValue: 'N/A', format: '@'},
   campaignBudgetName: {defaultValue: 'N/A', format: '@'},
   campaignBudgetAmount: {defaultValue: null, format: '#,##0.00'},
@@ -651,22 +653,22 @@ function extractBudgetDetails(campaignBudget) {
 function extractRecommendationImpactStats(impactMetrics) {
   const startTime = new Date().getTime();
   const details = {
-    recommendationBaseCost: 'N/A',
-    recommendationPotentialCost: 'N/A',
-    recommendationBaseClicks: 'N/A',
-    recommendationPotentialClicks: 'N/A',
-    recommendationBaseConversions: 'N/A',
-    recommendationPotentialConversions: 'N/A',
-    recommendationBaseImpressions: 'N/A',
-    recommendationPotentialImpressions: 'N/A',
-    recommendationBaseVideoViews: 'N/A',
-    recommendationPotentialVideoViews: 'N/A',
-    recommendationBaseConversionsValue: 'N/A',
-    recommendationPotentialConversionsValue: 'N/A',
-    recommendationBaseCpa: 'N/A',
-    recommendationPotentialCpa: 'N/A',
-    recommendationBaseRoas: 'N/A',
-    recommendationPotentialRoas: 'N/A',
+    recommendationBaseCost: null,
+    recommendationPotentialCost: null,
+    recommendationBaseClicks: null,
+    recommendationPotentialClicks: null,
+    recommendationBaseConversions: null,
+    recommendationPotentialConversions: null,
+    recommendationBaseImpressions: null,
+    recommendationPotentialImpressions: null,
+    recommendationBaseVideoViews: null,
+    recommendationPotentialVideoViews: null,
+    recommendationBaseConversionsValue: null,
+    recommendationPotentialConversionsValue: null,
+    recommendationBaseCpa: null,
+    recommendationPotentialCpa: null,
+    recommendationBaseRoas: null,
+    recommendationPotentialRoas: null,
   };
 
   try {
@@ -908,6 +910,8 @@ function fetchAllCampaignData(campaignResourceNames) {
       campaignType: 'N/A',
       campaignSubType: 'N/A',
       campaignIsAiMax: false,
+      campaignAiMaxTextCustomizationEnabled: false,
+      campaignAiMaxFinalUrlExpansionEnabled: false,
       campaignBudgetAmount: null,
       campaignBudgetTotalAmount: null,
       campaignBudgetDeliveryMethod: 'N/A',
@@ -963,6 +967,7 @@ function fetchAllCampaignData(campaignResourceNames) {
           campaign.advertising_channel_type,
           campaign.advertising_channel_sub_type,
           campaign.ai_max_setting.enable_ai_max,
+          campaign.asset_automation_settings,
           campaign.bidding_strategy_type,
           campaign.bidding_strategy,
           campaign.maximize_conversions.target_cpa_micros,
@@ -1000,6 +1005,27 @@ function fetchAllCampaignData(campaignResourceNames) {
       campaignDetails.campaignSubType = row.campaign.advertisingChannelSubType;
       campaignDetails.campaignIsAiMax =
           row.campaign.aiMaxSetting?.enableAiMax || false;
+
+      // Extract Asset Automation Settings
+      const rawSettings = row.campaign.assetAutomationSettings || [];
+      let settings = [];
+      if (Array.isArray(rawSettings)) {
+        settings = rawSettings;
+      } else if (typeof rawSettings === 'object' && rawSettings !== null) {
+        settings = Object.values(rawSettings);
+      }
+      for (const setting of settings) {
+        const type = setting.assetAutomationType;
+        const status = setting.assetAutomationStatus;
+        if (type === 'TEXT_ASSET_AUTOMATION') {
+          campaignDetails.campaignAiMaxTextCustomizationEnabled =
+              status === 'OPTED_IN';
+        } else if (type === 'FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION') {
+          campaignDetails.campaignAiMaxFinalUrlExpansionEnabled =
+              status === 'OPTED_IN';
+        }
+      }
+
       campaignDetails.campaignBiddingStrategyType =
           row.campaign.biddingStrategyType;
 
@@ -1600,8 +1626,15 @@ function writeDataToSheet(spreadsheet, sheetName, reportData) {
         const format = REPORT_SCHEMA_TEMPLATE[header].format;
         // Apply format to the entire column, starting from the second row
         const columnRange = sheet.getRange(2, i + 1, sheet.getMaxRows() - 1);
-        columnRange.setNumberFormat(format);
-        log(`  - Column '${header}' formatted as '${format}'.`, 'debug');
+        try {
+          columnRange.setNumberFormat(format);
+          if (header === 'campaign30DaysAvgTargetCpa') {
+             log(`*** DEBUG: Explicitly formatted 'campaign30DaysAvgTargetCpa' (Col ${i+1}) with format: '${format}' ***`, 'debug');
+          }
+          log(`  - Column '${header}' formatted as '${format}'.`, 'debug');
+        } catch (e) {
+          log(`  - WARNING: Failed to format column '${header}' with format '${format}'. Error: ${e.message}`);
+        }
       }
     }
     log('Column formatting applied.');
@@ -2214,7 +2247,7 @@ function main() {
 
     sendSetupEmail(spreadsheetUrl, DYNAMIC_REPORT_NAME, accountName, effectiveUserEmail);
   } else {
-    log("Spreadsheet already exists. Skipping setup email to avoid spam.");
+    log("Spreadsheet already exists, skipping setup email.");
   }
 
   const scriptEndTime = new Date().getTime();
