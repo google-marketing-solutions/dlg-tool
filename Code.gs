@@ -339,110 +339,324 @@ const RECOMMENDATION_HANDLERS = {
 
 
 const REPORT_SCHEMA_TEMPLATE = {
-  // --- Basic Info (Should be always available) ---
-  accountId: {defaultValue: 'N/A', format: '@'},
-  accountName: {defaultValue: 'N/A', format: '@'},
-  timestamp: {defaultValue: null, format: 'yyyy-mm-dd hh:mm:ss'},
-  recommendationId: {defaultValue: 'N/A', format: '@'},
-  recommendationType: {defaultValue: 'N/A', format: '@'},
-  recommendationsDetailsUrl: {defaultValue: 'N/A', format: '@'},
-  // --- Default values for all other fields ---
-  campaignUrl: {defaultValue: 'N/A', format: '@'},
-  campaignId: {defaultValue: 'N/A', format: '@'},
-  campaignName: {defaultValue: 'N/A', format: '@'},
-  campaignType: {defaultValue: 'N/A', format: '@'},
-  campaignSubType: {defaultValue: 'N/A', format: '@'},
-  campaignIsAiMax: {defaultValue: false, format: '@'},
-  campaignAiMaxTextCustomizationEnabled: {defaultValue: false, format: '@'},
-  campaignAiMaxFinalUrlExpansionEnabled: {defaultValue: false, format: '@'},
-  currencyCode: {defaultValue: 'N/A', format: '@'},
-  campaignBudgetName: {defaultValue: 'N/A', format: '@'},
-  campaignBudgetAmount: {defaultValue: null, format: '#,##0.00'},
-  campaignBudgetTotalAmount: {defaultValue: null, format: '#,##0.00'},
-  campaignBudgetDeliveryMethod: {defaultValue: 'N/A', format: '@'},
-  campaignBudgetType: {defaultValue: 'N/A', format: '@'},
-  campaignBudgetIsShared: {defaultValue: 'N/A', format: '@'},
-  campaignIsPortfolioBiddingStrategy: {defaultValue: 'N/A', format: '@'},
-  campaignPortfolioBiddingStrategyName: {defaultValue: 'N/A', format: '@'},
-  campaignPortfolioIsManagerOwned: {defaultValue: 'N/A', format: '@'},
-  campaignBiddingStrategyType: {defaultValue: 'N/A', format: '@'},
-  campaignBiddingTargetRoas: {defaultValue: null, format: '0.00'},
-  campaignBiddingTargetCpa: {defaultValue: null, format: '#,##0.00'},
-  campaignStatsYesterdayCost: {defaultValue: null, format: '#,##0.00'},
-  campaignStats7DaysCost: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysCost: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysConversionsValue: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysConversions: {defaultValue: null, format: '#,##0'},
-  campaign30DaysRoas: {defaultValue: null, format: '0.00'},
-  campaign30DaysCpa: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysAvgCpm: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysAvgCpv: {defaultValue: null, format: '#,##0.00'},
-  campaign30DaysUniqueUsers: {defaultValue: null, format: '#,##0'},
-  campaign30DaysAvgTargetRoas: {defaultValue: null, format: '0.00'},
-  campaign30DaysAvgTargetCpa: {defaultValue: null, format: '#,##0.00'},
+  // --- Basic Info ---
+  accountId: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: '000-000-0000'
+  },
+  accountName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: '!!! SCHEMA DEFINITION (FILTER ME OUT)'
+  },
+  timestamp: {
+    defaultValue: null,
+    format: 'yyyy-mm-dd hh:mm:ss',
+    dummyValueForFormatting: new Date(0)
+  },
+  recommendationId: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'DUMMY_RECO_ID'
+  },
+  recommendationType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'DUMMY_TYPE'},
+  recommendationsDetailsUrl: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'https://ads.google.com'
+  },
+
+  // --- Campaign Details ---
+  campaignUrl: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'https://ads.google.com'
+  },
+  campaignId: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'DUMMY_SCHEMA_ROW'
+  },
+  campaignName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'DUMMY_CAMPAIGN'
+  },
+  campaignType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'SEARCH'},
+  campaignSubType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'N/A'},
+  campaignIsAiMax:
+      {defaultValue: false, format: '@', dummyValueForFormatting: false},
+  campaignAiMaxTextCustomizationEnabled:
+      {defaultValue: false, format: '@', dummyValueForFormatting: false},
+  campaignAiMaxFinalUrlExpansionEnabled:
+      {defaultValue: false, format: '@', dummyValueForFormatting: false},
+  currencyCode:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'USD'},
+
+  // --- Budget Info ---
+  campaignBudgetName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'DUMMY_BUDGET'
+  },
+  campaignBudgetAmount:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignBudgetTotalAmount:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignBudgetDeliveryMethod:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'STANDARD'},
+  campaignBudgetType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'DAILY'},
+  campaignBudgetIsShared:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: false},
+
+  // --- Bidding Info ---
+  campaignIsPortfolioBiddingStrategy:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: false},
+  campaignPortfolioBiddingStrategyName:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'N/A'},
+  portfolioStrategyResourceName:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'N/A'},
+  portfolioOwnerId:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: '000-000-0000'},
+  isLocallyOwnedPortfolio:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'FALSE'},
+  campaignPortfolioIsManagerOwned:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: false},
+  campaignBiddingStrategyType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'MANUAL_CPC'},
+  campaignBiddingTargetRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  campaignBiddingTargetCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+
+  // --- Performance Stats (Yesterday / 7 Days / 30 Days) ---
+  campaignStatsYesterdayCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignStats7DaysCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysConversionsValue:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysConversions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  campaign30DaysRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysAvgCpm:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysAvgCpv:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysUniqueUsers:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  campaign30DaysAvgTargetRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  campaign30DaysAvgTargetCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
   campaign30DaysSearchRankLostImpressionShare:
-      {defaultValue: null, format: '0.00%'},
+      {defaultValue: null, format: '0.00%', dummyValueForFormatting: 0.0},
   campaign30DaysSearchBudgetLostImpressionShare:
-      {defaultValue: null, format: '0.00%'},
-  campaign30DaysTargetChangesCount: {defaultValue: null, format: '#,##0'},
-  campaignCustomRangeCost: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeConversionsValue: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeConversions: {defaultValue: null, format: '#,##0'},
-  campaignCustomRangeRoas: {defaultValue: null, format: '0.00'},
-  campaignCustomRangeCpa: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeAvgCpm: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeAvgCpv: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeUniqueUsers: {defaultValue: null, format: '#,##0'},
-  campaignCustomRangeAvgTargetRoas: {defaultValue: null, format: '0.00'},
-  campaignCustomRangeAvgTargetCpa: {defaultValue: null, format: '#,##0.00'},
-  campaignCustomRangeStartDate: {defaultValue: 'N/A', format: 'yyyy-mm-dd'},
-  campaignCustomRangeEndDate: {defaultValue: 'N/A', format: 'yyyy-mm-dd'},
+      {defaultValue: null, format: '0.00%', dummyValueForFormatting: 0.0},
+  campaign30DaysTargetChangesCount:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+
+  // --- Custom Range Stats ---
+  campaignCustomRangeCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeConversionsValue:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeConversions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  campaignCustomRangeRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeAvgCpm:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeAvgCpv:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeUniqueUsers:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  campaignCustomRangeAvgTargetRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeAvgTargetCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  campaignCustomRangeStartDate: {
+    defaultValue: 'N/A',
+    format: 'yyyy-mm-dd',
+    dummyValueForFormatting: new Date(0)
+  },
+  campaignCustomRangeEndDate: {
+    defaultValue: 'N/A',
+    format: 'yyyy-mm-dd',
+    dummyValueForFormatting: new Date(0)
+  },
   campaignCustomRangeSearchRankLostImpressionShare:
-      {defaultValue: null, format: '0.00%'},
+      {defaultValue: null, format: '0.00%', dummyValueForFormatting: 0.0},
   campaignCustomRangeSearchBudgetLostImpressionShare:
-      {defaultValue: null, format: '0.00%'},
-  recommendationCurrentBudgetAmount: {defaultValue: null, format: '#,##0.00'},
-  recommendationNewBudgetAmount: {defaultValue: null, format: '#,##0.00'},
-  recommendationNewTargetCpa: {defaultValue: null, format: '#,##0.00'},
-  recommendationNewTargetRoas: {defaultValue: null, format: '0.00'},
-  recommendationBaseCost: {defaultValue: null, format: '#,##0.00'},
-  recommendationPotentialCost: {defaultValue: null, format: '#,##0.00'},
-  recommendationBaseClicks: {defaultValue: null, format: '#,##0'},
-  recommendationPotentialClicks: {defaultValue: null, format: '#,##0'},
-  recommendationBaseConversions: {defaultValue: null, format: '#,##0'},
-  recommendationPotentialConversions: {defaultValue: null, format: '#,##0'},
-  recommendationBaseConversionsValue: {defaultValue: null, format: '#,##0'},
-  recommendationPotentialConversionsValue: {defaultValue: null, format: '#,##0'},
-  recommendationBaseCpa: {defaultValue: null, format: '#,##0.00'},
-  recommendationPotentialCpa: {defaultValue: null, format: '#,##0.00'},
-  recommendationBaseRoas: {defaultValue: null, format: '0.00'},
-  recommendationPotentialRoas: {defaultValue: null, format: '0.00'},
-  recommendationBaseImpressions: {defaultValue: null, format: '#,##0'},
-  recommendationPotentialImpressions: {defaultValue: null, format: '#,##0'},
-  recommendationBaseVideoViews: {defaultValue: null, format: '#,##0'},
-  recommendationPotentialVideoViews: {defaultValue: null, format: '#,##0'},
+      {defaultValue: null, format: '0.00%', dummyValueForFormatting: 0.0},
+
+  // --- Recommendation Details & Impact ---
+  recommendationCurrentBudgetAmount:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationNewBudgetAmount:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationNewTargetCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationNewTargetRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  recommendationBaseCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationPotentialCost:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationBaseClicks:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationPotentialClicks:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationBaseConversions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationPotentialConversions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationBaseConversionsValue:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0.0},
+  recommendationPotentialConversionsValue:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0.0},
+  recommendationBaseCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationPotentialCpa:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationBaseRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  recommendationPotentialRoas:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  recommendationBaseImpressions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationPotentialImpressions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationBaseVideoViews:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  recommendationPotentialVideoViews:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+
+  // --- Derived Calculations ---
   campaignCalculated30DaysPotentialConversionValue:
-      {defaultValue: null, format: '#,##0.00'},
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
   campaignCalculatedCustomRangePotentialConversionValue:
-      {defaultValue: null, format: '#,##0.00'},
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
   campaignPercentageOfBudgetUsedYesterday:
-      {defaultValue: null, format: '0.00%'},
-  weeklyCostIncrease: {defaultValue: null, format: '#,##0.00'},
-  newWeeklyConversions: {defaultValue: null, format: '#,##0'},
-  dailyBudget30Days: {defaultValue: null, format: '#,##0.00'},
-  dailyBudgetDelta: {defaultValue: null, format: '#,##0.00'},
-  targetRoasDelta: {defaultValue: null, format: '0.00'},
-  targetCpaDelta: {defaultValue: null, format: '#,##0.00'},
-  recommendationCpaDelta: {defaultValue: null, format: '#,##0.00'},
-  recommendationRoasDelta: {defaultValue: null, format: '0.00'},
-  // --- Fields for MOVE_UNUSED_BUDGET recommendations ---
-  moveBudgetAmount: {defaultValue: 0, format: '#,##0.00'},
-  moveBudgetSourceCampaigns: {defaultValue: 'N/A', format: '@'},
-  moveBudgetSourceBudgetName: {defaultValue: 'N/A', format: '@'},
-  moveBudgetSourceBudgetType: {defaultValue: 'N/A', format: '@'},
-  moveBudgetSourceBudgetDeliveryMethod: {defaultValue: 'N/A', format: '@'},
-  moveBudgetSourceBudgetIsShared: {defaultValue: 'N/A', format: '@'},
-  moveBudgetSourceBudgetAmount: {defaultValue: 0, format: '#,##0.00'},
+      {defaultValue: null, format: '0.00%', dummyValueForFormatting: 0.0},
+  weeklyCostIncrease:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  newWeeklyConversions:
+      {defaultValue: null, format: '#,##0', dummyValueForFormatting: 0},
+  dailyBudget30Days:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  dailyBudgetDelta:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  targetRoasDelta:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+  targetCpaDelta:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationCpaDelta:
+      {defaultValue: null, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  recommendationRoasDelta:
+      {defaultValue: null, format: '0.00', dummyValueForFormatting: 0.0},
+
+  // --- MOVE_UNUSED_BUDGET Specifics ---
+  moveBudgetAmount:
+      {defaultValue: 0, format: '#,##0.00', dummyValueForFormatting: 0.0},
+  moveBudgetSourceCampaigns: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'CAMPAIGN_1, CAMPAIGN_2'
+  },
+  moveBudgetSourceBudgetName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'SOURCE_BUDGET'
+  },
+  moveBudgetSourceBudgetType:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'DAILY'},
+  moveBudgetSourceBudgetDeliveryMethod:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: 'STANDARD'},
+  moveBudgetSourceBudgetIsShared:
+      {defaultValue: 'N/A', format: '@', dummyValueForFormatting: false},
+  moveBudgetSourceBudgetAmount:
+      {defaultValue: 0, format: '#,##0.00', dummyValueForFormatting: 0.0},
+};
+
+const TARGET_CHANGE_EVENTS_SCHEMA_TEMPLATE = {
+  accountId: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: '000-000-0000'
+  },
+  accountName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: '!!! SCHEMA DEFINITION (FILTER ME OUT)'
+  },
+  campaignId: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'DUMMY_ID'
+  },
+  biddingStrategyType: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'TARGET_ROAS'
+  },
+  eventDateTime: {
+    defaultValue: null,
+    format: 'yyyy-mm-dd hh:mm:ss',
+    dummyValueForFormatting: new Date(0)
+  },
+  user: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'user@example.com'
+  },
+  clientType: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'USER'
+  },
+  resourceType: {
+    defaultValue: 'CAMPAIGN',
+    format: '@',
+    dummyValueForFormatting: 'CAMPAIGN'
+  },
+  resourceName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'customers/123/changeEvents/456'
+  },
+  fieldName: {
+    defaultValue: 'N/A',
+    format: '@',
+    dummyValueForFormatting: 'target_roas'
+  },
+  operation: {
+    defaultValue: 'UPDATE',
+    format: '@',
+    dummyValueForFormatting: 'UPDATE'
+  },
+  oldTarget: {
+    defaultValue: null,
+    format: '#,##0.00',
+    dummyValueForFormatting: 0.0
+  },
+  newTarget: {
+    defaultValue: null,
+    format: '#,##0.00',
+    dummyValueForFormatting: 0.0
+  }
 };
 
 /**
@@ -1273,46 +1487,7 @@ function getInfoFromRecoId(recommendationId) {
   return {ocid, recoTypeId};
 }
 
-/**
- * Fetches the OCID (Operating Customer ID) for a given Google Ads account ID.
- * The OCID is extracted from the optimization score URL.
- * @param {string} accountId The external customer ID of the account.
- * @return {!Object} An object containing the OCID.
- */
-function getOcid(accountId) {
-  const startTime = new Date().getTime();
-  let ocid = 'N/A';
 
-  try {
-    log('Getting OCID for account:', 'debug');
-    const ocidQuery = `
-      SELECT
-        customer.id,
-        metrics.optimization_score_url
-      FROM customer
-      WHERE customer.id = '${accountId.replace(/-/g, '')}'`;
-
-
-    const ocidResult = AdsApp.search(ocidQuery);
-
-    if (ocidResult.hasNext()) {
-      const row = ocidResult.next();
-      if (row.metrics && row.metrics.optimizationScoreUrl) {
-        const optiScoreUrl = row.metrics.optimizationScoreUrl;
-        const match = optiScoreUrl.match(/[?&]ocid=([^&]*)/);
-        ocid = match ? match[1] : 'N/A';
-      }
-    } else {
-      log('Warning: No OCID found for ', accountId,
-          '(unable to find OptiScore URL from which to extract the ID).');
-    }
-  } catch (err) {
-    log(`ERROR - Unable to fetch OCID for ${accountId}: ${err.message}`);
-  }
-
-  log(`getOcid took ${((new Date().getTime() - startTime) / 1000).toFixed(2)}s`, 'verbose_timing');
-  return {ocid: ocid};
-}
 
 /**
  * Orchestrates the entire processing for an account, turning recommendations
@@ -1526,7 +1701,7 @@ function processAccountRecommendations(account, counter, totalAccounts) {
 
       rowData.recommendationCpaDelta = calculateDelta(
         rowData.recommendationBaseCpa, rowData.recommendationPotentialCpa);
-      recommendationRoasDelta = calculateDelta(
+      rowData.recommendationRoasDelta = calculateDelta(
         rowData.recommendationBaseRoas, rowData.recommendationPotentialRoas);
 
       log(`Final calculations took ${
@@ -1561,16 +1736,31 @@ function processAccountRecommendations(account, counter, totalAccounts) {
 
 
 /**
- * Writes a list of objects to a Google Sheet, including header extraction and
- * data transformation.
- *
- * @param {!Spreadsheet} spreadsheet The Google Spreadsheet object.
- * @param {string} sheetName The name of the worksheet to write to.
- * @param {!Array<!Object>} reportData An array of objects with uniform
- * properties to write.
- * @return {void}
+ * Creates a dummy row with explicit values to force Looker Studio's
+ * type detection logic.
+ * @param {Object=} schemaTemplate Optional schema template to use.
+ * @return {!Object}
  */
-function writeDataToSheet(spreadsheet, sheetName, reportData) {
+function createSchemaDummyRow(schemaTemplate) {
+  const dummyRow = {};
+  const template = schemaTemplate || REPORT_SCHEMA_TEMPLATE;
+  for (const key in template) {
+    const field = template[key];
+    dummyRow[key] = field.dummyValueForFormatting !== undefined ?
+        field.dummyValueForFormatting :
+        field.defaultValue;
+  }
+  return dummyRow;
+}
+
+/**
+ * Updated writeDataToSheet to include the dummy row efficiently.
+ * @param {!Spreadsheet} spreadsheet The Google Spreadsheet object.
+ * @param {string} sheetName The name of the sheet to write to.
+ * @param {?Array<!Object>} reportData The data to write to the sheet.
+ * @param {Object=} schemaTemplate Optional schema template for formatting and dummy row.
+ */
+function writeDataToSheet(spreadsheet, sheetName, reportData, schemaTemplate) {
   let sheet = spreadsheet.getSheetByName(sheetName);
 
   if (!sheet) {
@@ -1578,34 +1768,42 @@ function writeDataToSheet(spreadsheet, sheetName, reportData) {
     log(`Sheet "${sheetName}" created.`);
   }
 
-  // Check for the default "Sheet1" and delete it if other sheets exist.
   const defaultSheet = spreadsheet.getSheetByName("Sheet1");
   if (defaultSheet && spreadsheet.getSheets().length > 1) {
     try {
       spreadsheet.deleteSheet(defaultSheet);
-      log('Deleted default "Sheet1".');
     } catch (e) {
-      log('Could not delete "Sheet1" (it might be the only sheet remaining).');
+      log('Could not delete "Sheet1".');
     }
   }
 
+  // Always clear the sheet to prevent stale data from lingering.
+  sheet.clear();
+
+  let headers = [];
   if (reportData && reportData.length > 0) {
-    // Clear the entire sheet before writing new data
-    sheet.clear();
+    headers = Object.keys(reportData[0]);
+  } else if (schemaTemplate) {
+    // If no data but schema exists, use schema keys as headers.
+    headers = Object.keys(schemaTemplate);
+  }
 
-    const headers =
-        Object.keys(reportData[0]);  // Extract headers from the first object
-    const dataRows = [];
+  if (headers.length > 0) {
+    const dataRows = [headers];
 
-    dataRows.push(headers);  // Add headers as the first row
+    // 1. Insert the Schema Dummy Row if a schema template is provided
+    if (schemaTemplate) {
+      const dummyRowObject = createSchemaDummyRow(schemaTemplate);
+      const dummyRowArray = headers.map(header => dummyRowObject[header]);
+      dataRows.push(dummyRowArray);
+    }
 
-    // Transform object array into 2D data array
-    for (let i = 0; i < reportData.length; i++) {
-      const row = [];
-      for (let j = 0; j < headers.length; j++) {
-        row.push(reportData[i][headers[j]]);
+    // 2. Transform and push actual data (if any)
+    if (reportData && reportData.length > 0) {
+      for (let i = 0; i < reportData.length; i++) {
+        const row = headers.map(header => reportData[i][header]);
+        dataRows.push(row);
       }
-      dataRows.push(row);
     }
 
     const numRows = dataRows.length;
@@ -1614,33 +1812,23 @@ function writeDataToSheet(spreadsheet, sheetName, reportData) {
 
     range.setValues(dataRows);
 
-    log(`Data written to sheet "${sheetName}", range: ${
-        range.getA1Notation()}`);
+    log(`Data written to sheet "${sheetName}" (Dummy row: ${
+        !!schemaTemplate}).`);
 
-    // --- Apply Column Formatting ---
-    log('Applying column formatting...');
-    for (let i = 0; i < headers.length; i++) {
-      const header = headers[i];
-      if (REPORT_SCHEMA_TEMPLATE[header] &&
-          REPORT_SCHEMA_TEMPLATE[header].format) {
-        const format = REPORT_SCHEMA_TEMPLATE[header].format;
-        // Apply format to the entire column, starting from the second row
-        const columnRange = sheet.getRange(2, i + 1, sheet.getMaxRows() - 1);
-        try {
+    // 3. Apply Column Formatting if schema provided
+    if (schemaTemplate) {
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i];
+        if (schemaTemplate[header] &&
+            schemaTemplate[header].format) {
+          const format = schemaTemplate[header].format;
+          const columnRange = sheet.getRange(2, i + 1, sheet.getMaxRows() - 1);
           columnRange.setNumberFormat(format);
-          if (header === 'campaign30DaysAvgTargetCpa') {
-             log(`*** DEBUG: Explicitly formatted 'campaign30DaysAvgTargetCpa' (Col ${i+1}) with format: '${format}' ***`, 'debug');
-          }
-          log(`  - Column '${header}' formatted as '${format}'.`, 'debug');
-        } catch (e) {
-          log(`  - WARNING: Failed to format column '${header}' with format '${format}'. Error: ${e.message}`);
         }
       }
     }
-    log('Column formatting applied.');
-
   } else {
-    log(`No data rows to write to sheet "${sheetName}".`);
+    log(`No data and no schema to write to sheet "${sheetName}". Sheet cleared.`);
   }
 }
 
@@ -1689,12 +1877,23 @@ function calculateAndWriteSummaryData(spreadsheet, reportData) {
     }
   ];
 
-  writeDataToSheet(spreadsheet, 'Summary', summaryData);
+  writeDataToSheet(spreadsheet, 'Summary', summaryData, null);
   log(`calculateAndWriteSummaryData took ${
           ((new Date().getTime() - startTime) / 1000).toFixed(2)}s`,
       'timing');
 }
 
+/**
+ * Processes an individual account to fetch campaign target change events.
+ * It queries for campaign update events related to target ROAS or target CPA
+ * within the last 29 days.
+ *
+ * @param {!AdsManagerApp.Account} account The Google Ads account object.
+ * @param {number} counter The current account number being processed.
+ * @param {number} totalAccounts The total number of accounts to process.
+ * @return {!Array<!Object>} An array of objects, each representing a target
+ *     change event.
+ */
 function processAccountTargetChanges(account, counter, totalAccounts) {
   const accountStartTime = new Date().getTime();
   AdsManagerApp.select(account);
@@ -1776,26 +1975,7 @@ function processAccountTargetChanges(account, counter, totalAccounts) {
   return results;
 }
 
-/**
- * Loads a configuration object from the spreadsheet.
- *
- * @param {!Spreadsheet} spreadsheet The Google Spreadsheet object.
- * @return {!Object} A configuration object.
- */
-function readConfig(spreadsheet) {
-  const mccAccountId =
-      spreadsheet.getRangeByName('mccAccountId').getValues().flat()[0];
-  const excludedAccounts =
-      spreadsheet.getRangeByName('excludedAccounts').getValues().flat();
-  const excludedCampaigns =
-      spreadsheet.getRangeByName('excludedCampaigns').getValues().flat();
 
-  return {
-    'mccAccountId': mccAccountId,
-    'excludedAccounts': excludedAccounts.filter(item => item),
-    'excludedCampaigns': excludedCampaigns.filter(item => item),
-  };
-}
 
 /**
  * Detects the effective email of the user running the script by creating
@@ -1983,32 +2163,21 @@ function progressBar(current, total, width = 54) {
  * @return {!Map<number, !AdsManagerApp.Account>} Map of internal CID to account
  * object.
  */
-function buildInternalIdToAccountMap(topLevelAccount) {
+function buildInternalIdToAccountMap(subAccounts, topLevelAccount) {
   log('Building internal ID to Account object map...', 'timing');
   const startTime = new Date().getTime();
-  const accountIterator = AdsManagerApp.accounts().get();
   const internalIdToAccountMap = new Map();
-  const accounts = [];
-  while (accountIterator.hasNext()) {
-    accounts.push(accountIterator.next());
-  }
-  accounts.push(topLevelAccount);  // also need to map top level
-  log(`Found ${accounts.length} accounts to map.`, 'debug');
+  
+  // Combine sub-accounts with the top-level account for mapping
+  const accountsToMap = [...subAccounts, topLevelAccount];
+  
+  log(`Found ${accountsToMap.length} accounts to map (including MCC).`, 'debug');
 
-  for (const account of accounts) {
+  for (const account of accountsToMap) {
     try {
-      log(`Mapping account: ${account.getCustomerId()} (${account.getName()})`,
-          'debug');
-      AdsManagerApp.select(account);
-      const result = AdsApp.search('SELECT customer.id FROM customer LIMIT 1');
-      if (result.hasNext()) {
-        const internalId = result.next().customer.id;
-        log(`  -> Internal ID: ${internalId}`, 'debug');
-        internalIdToAccountMap.set(internalId, account);
-      } else {
-        log(`  -> No internal ID found for ${account.getCustomerId()}.`,
-            'debug');
-      }
+      // The internal ID (integer) is just the Customer ID with dashes removed.
+      const internalId = parseInt(account.getCustomerId().replace(/-/g, ''), 10);
+      internalIdToAccountMap.set(internalId, account);
     } catch (e) {
       log(`Could not get internal ID for account ${account.getCustomerId()}: ${
           e}`);
@@ -2017,8 +2186,6 @@ function buildInternalIdToAccountMap(topLevelAccount) {
   log(`Building internal ID map took ${
           ((new Date().getTime() - startTime) / 1000).toFixed(2)}s`,
       'timing');
-  log('Finished building internalIdToAccountMap:', 'debug');
-  log(internalIdToAccountMap, 'debug');
   return internalIdToAccountMap;
 }
 
@@ -2191,18 +2358,24 @@ function main() {
 
   const accountSelector = AdsManagerApp.accounts();
   const accountIterator = accountSelector.get();
-  const totalAccounts = accountIterator.totalNumEntities();
+  
+  // Optimization: Load all accounts into memory once to avoid double-fetching.
+  // AdsManagerApp iterators are network-bound, so iterating them twice (once for mapping, once for processing) is slow.
+  const subAccounts = [];
+  while (accountIterator.hasNext()) {
+    subAccounts.push(accountIterator.next());
+  }
+  const totalAccounts = subAccounts.length;
   log(`Found ${totalAccounts} sub-accounts to process.`);
 
-  // Build account map
-  const internalIdToAccountMap = buildInternalIdToAccountMap(topLevelAccount);
+  // Build account map using the pre-fetched list
+  const internalIdToAccountMap = buildInternalIdToAccountMap(subAccounts, topLevelAccount);
 
   let recommendations = [];
   let targetChanges = [];
 
   let counter = 1;
-  while (accountIterator.hasNext()) {
-    const account = accountIterator.next();
+  for (const account of subAccounts) {
     try {
       recommendations.push.apply(
           recommendations,
@@ -2224,8 +2397,8 @@ function main() {
 
   recommendations = enrichWithTargetChanges(recommendations, targetChanges);
 
-  writeDataToSheet(spreadsheet, 'Data', recommendations);
-  writeDataToSheet(spreadsheet, 'TargetChangeEvents', targetChanges);
+  writeDataToSheet(spreadsheet, 'Data', recommendations, REPORT_SCHEMA_TEMPLATE);
+  writeDataToSheet(spreadsheet, 'TargetChangeEvents', targetChanges, TARGET_CHANGE_EVENTS_SCHEMA_TEMPLATE);
   calculateAndWriteSummaryData(spreadsheet, recommendations);
 
   // 4. Send Setup Email
@@ -2247,7 +2420,7 @@ function main() {
 
     sendSetupEmail(spreadsheetUrl, DYNAMIC_REPORT_NAME, accountName, effectiveUserEmail);
   } else {
-    log("Spreadsheet already exists, skipping setup email.");
+    log('Spreadsheet already exists, skipping setup email.');
   }
 
   const scriptEndTime = new Date().getTime();
