@@ -7,7 +7,7 @@
 CONFIG = {
   // The template ID of the Looker Studio dashboard to be used for the report.
   // Don't change it unless you know what you're doing
-  'LOOKER_TEMPLATE_ID': '0c3f445f-ae15-471c-a850-cfc1aaf53b83',
+  'LOOKER_TEMPLATE_ID': '3be2586b-59a5-448d-83d4-b2404879b16c',
 
   // Set to true to see detailed logs, false for production.
   'debug_logs': false,
