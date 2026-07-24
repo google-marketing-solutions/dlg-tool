@@ -5,6 +5,12 @@ Allocation Dashboard.
 
 **Last Updated:** 2025-10-30
 
+> [!IMPORTANT]
+> ### ⚠️ Version Selection Notice (Which version should you deploy?)
+>
+> * **Enterprise:** Developed to support larger accounts and multi-MCC enterprise use cases (handling thousands of accounts and multi-currency aggregation). Requires Google Cloud Platform (GCP). You can find the enterprise version here - https://github.com/google-marketing-solutions/demand-led-growth/.
+> * **Light:** Choose this if you or your customer prefers a lighter deployment without GCP requirements (runs via Apps Script). This is this repository, continue below.
+
 ## Overview
 
 This script is the data-gathering engine for the Budget Allocation Dashboard
