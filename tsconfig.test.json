@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "google-apps-script", "google-ads-scripts"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mjs"]
+}
