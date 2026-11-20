@@ -1,0 +1,22 @@
+{
+  "name": "dlg-tool",
+  "version": "2.0.0",
+  "description": "Demand-Led Growth (DLG) v2 Google Ads Script & Google Sheets Connector",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && node scripts/build.mjs",
+    "push:sheet": "npm run build && node scripts/check-clasp.mjs && clasp push --force",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1",
+    "@types/google-ads-scripts": "^1.0.6",
+    "@types/google-apps-script": "^1.0.99",
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
