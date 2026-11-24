@@ -859,6 +859,36 @@ describe('Portfolio keys, budget dedupe and donor targets', () => {
     expect(troasRow.moveBudgetSourceTargetCpa).toBeNull();
     expect(troasRow.moveBudgetSourceTargetRoas).toBe(5.5);
   });
+
+  it('truncates portfolioMemberCampaignNames within Google Sheets cell limit while keeping full portfolioCampaignsCount', () => {
+    const memberCount = 1_200;
+    const rows = Array.from({length: memberCount}, (_, i) => ({
+      ...createEmptyReportRow(),
+      recommendationId: 'customers/1000000001/recommendations/9001',
+      recommendationType: 'RAISE_TARGET_CPA',
+      accountId: '100-000-0001',
+      campaignId: String(i + 1),
+      campaignName: `Global_Search_Brand_Campaign_With_A_Long_Name_${String(i + 1).padStart(4, '0')}`,
+      campaignIsPortfolioBiddingStrategy: true,
+      portfolioStrategyResourceName: 'customers/1000000001/biddingStrategies/777',
+      portfolioOwnerId: '1000000001',
+    }));
+
+    const [row] = consolidateRowsByScope(rows);
+
+    expect(row.portfolioCampaignsCount).toBe(memberCount);
+    expect(row.portfolioMemberCampaignNames.length).toBe(49_987);
+    expect(
+      row.portfolioMemberCampaignNames.startsWith(
+        'Global_Search_Brand_Campaign_With_A_Long_Name_0001, '
+      )
+    ).toBe(true);
+    expect(
+      row.portfolioMemberCampaignNames.endsWith(
+        'Global_Search_Brand_Campaign_With_A_Long_Name_0961, ... (+239 more)'
+      )
+    ).toBe(true);
+  });
 });
 
 describe('Google Ads UI deep links (recommendationsDetailsUrl & campaignUrl)', () => {

@@ -16,6 +16,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {
+  MAX_SHEET_CELL_CHARS,
+  joinListForSheetCell,
   readReportRowsFromSheet,
   writeReportRowsToSheet,
 } from '../src/appscript/sheets/data-writer';
@@ -304,6 +306,23 @@ describe('Bulk Sheet Writer, Grid Expansion, Single-RPC Formatting & Dummy Row',
     expect(dataRows[0].campaignName).toBe('+Brand - Exact');
     expect(dataRows[0].campaignIsAiMax).toBe(true);
     expect(dataRows[0].campaign30DaysCost).toBe(123.45);
+  });
+
+  it('caps plain and formula-escaped cells at Google Sheets 50,000-char limit while keeping exact-limit cells intact', () => {
+    const sheet = new MockSheet('Data', 10);
+    const exactLimitRow = createEmptyReportRow();
+    exactLimitRow.portfolioMemberCampaignNames = 'A'.repeat(MAX_SHEET_CELL_CHARS);
+    const oversizedRow = createEmptyReportRow();
+    oversizedRow.portfolioMemberCampaignNames = 'C'.repeat(MAX_SHEET_CELL_CHARS + 500);
+    const formulaAtLimitRow = createEmptyReportRow();
+    formulaAtLimitRow.portfolioMemberCampaignNames = `=${'x'.repeat(MAX_SHEET_CELL_CHARS - 1)}`;
+
+    writeReportRowsToSheet(sheet, [exactLimitRow, oversizedRow, formulaAtLimitRow]);
+
+    const colIdx = SCHEMA_COLUMN_NAMES.indexOf('portfolioMemberCampaignNames') + 1;
+    expect(sheet.getRange(3, colIdx).getValue()).toBe('A'.repeat(MAX_SHEET_CELL_CHARS));
+    expect(sheet.getRange(4, colIdx).getValue()).toBe(`${'C'.repeat(MAX_SHEET_CELL_CHARS - 1)}…`);
+    expect(sheet.getRange(5, colIdx).getValue()).toBe(`'=${'x'.repeat(MAX_SHEET_CELL_CHARS - 3)}…`);
   });
 });
 
@@ -748,5 +767,13 @@ describe('sheet cell helpers', () => {
 
   it('builds a value matrix with blanks for null and escaped strings', () => {
     expect(toSheetValueMatrix(['a', 'b', 'c'], [{a: null, b: '=x', c: 3}])).toEqual([['', "'=x", 3]]);
+  });
+
+  it('joins campaign lists cleanly at an item boundary with (+N more) when exceeding the limit', () => {
+    expect(joinListForSheetCell([])).toBe('');
+    expect(joinListForSheetCell(['Alpha', 'Beta'], 50)).toBe('Alpha, Beta');
+    expect(joinListForSheetCell(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'], 28)).toBe(
+      'Alpha, Beta, ... (+3 more)'
+    );
   });
 });
