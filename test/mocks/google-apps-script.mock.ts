@@ -314,6 +314,11 @@ export class MockSheet {
   }
 
   setCellValue(row: number, col: number, value: unknown): void {
+    if (typeof value === 'string' && value.length > 50_000) {
+      throw new Error(
+        'Your input contains more than the maximum of 50000 characters in a single cell.'
+      );
+    }
     this.formulas.delete(this.key(row, col));
     const fmt = this.formats.get(this.key(row, col));
     if (typeof value === 'string' && value.length > 0 && fmt !== '@') {

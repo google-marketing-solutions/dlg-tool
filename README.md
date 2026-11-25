@@ -66,7 +66,7 @@ For the details, see [docs/architecture.md](docs/architecture.md).
 
 You need:
 
-* **Access to the template Google Sheet and Data Studio dashboard.** Ask your Google point of contact to add you to the group that can open them.
+* **Access to the template Google Sheet.** Ask your Google point of contact to grant you access and share the template URL.
 * **A Google Ads manager account (MCC)** where you can create and authorize scripts.
 * **A Google account that can edit your copy of the Google Sheet.** Use the same account to authorize the Google Ads script, because the script writes to the Sheet.
 
@@ -74,7 +74,7 @@ You need:
 
 These steps take you from the template to a working dashboard. The first data usually arrives within an hour.
 
-1. **Copy the template.** Open the [template Google Sheet copy link](https://docs.google.com/spreadsheets/d/1CbLXHi0rS7SRLKlMWRdWnOsWxlA8eK1usoNq4Mf6Y7A/copy?resourcekey=0-tSBQgOwikfVDBHK1Rm7NnA) and click **Make a copy**.
+1. **Copy the template.** Open the template Google Sheet and click **Make a copy**.
 2. **Get the Google Ads script.** In your copy, click **🚀 DLG Dashboard v2 → 📋 Copy Google Ads Script**. The first time you use the menu, Google asks you to authorize the Sheet's Apps Script; accept, then choose the menu item again. Click **📋 Copy to Clipboard**.
 3. **Install the script in Google Ads.** In your manager account, go to **Tools and settings → Bulk actions → Scripts**, create a new script, and paste the code. Click **Save**, **Authorize**, and then **Preview**. Preview registers the manager account and its accounts in your Sheet.
 4. **Schedule the script.** In the scripts list, set the script's frequency to **Hourly**. To add more manager accounts, repeat steps 3 and 4 in each one, using only top-level manager accounts.

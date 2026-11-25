@@ -42,6 +42,51 @@ import {withSheetLock} from '../run-state';
 
 /** Name of the published 82-column `Data` tab read by Data Studio. */
 export const DATA_SHEET_NAME = 'Data';
+/** Hard Google Sheets per-cell character limit (`setValues` throws above this). */
+export const MAX_SHEET_CELL_CHARS = 50_000;
+
+/**
+ * Truncates `val` to at most `maxChars` characters (default: Google Sheets' 50,000-char cell limit),
+ * appending `…` when truncated.
+ */
+function truncateForSheetCell(
+  val: string,
+  maxChars: number = MAX_SHEET_CELL_CHARS
+): string {
+  if (val.length <= maxChars) return val;
+  return maxChars > 0 ? `${val.slice(0, maxChars - 1)}…` : '';
+}
+
+/**
+ * Joins `items` with `", "` while staying within `maxChars` (default: `MAX_SHEET_CELL_CHARS - 1`
+ * so a leading formula-escape apostrophe still fits in a Google Sheets cell). When the full list
+ * exceeds `maxChars`, stops at a complete item boundary and appends `", ... (+N more)"`.
+ */
+export function joinListForSheetCell(
+  items: readonly string[],
+  maxChars: number = MAX_SHEET_CELL_CHARS - 1
+): string {
+  const full = items.join(', ');
+  if (full.length <= maxChars) return full;
+
+  let current = '';
+  let included = 0;
+  for (let i = 0; i < items.length; i++) {
+    const remaining = items.length - (i + 1);
+    const suffix = remaining > 0 ? `, ... (+${remaining} more)` : '';
+    const candidate = i === 0 ? items[0] : `${current}, ${items[i]}`;
+    if (candidate.length + suffix.length <= maxChars) {
+      current = candidate;
+      included = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  return included > 0
+    ? `${current}, ... (+${items.length - included} more)`
+    : truncateForSheetCell(items[0], maxChars);
+}
 
 /**
  * Writes an array of `ReportRow` objects to the `Data` sheet (runs in `dist/sheet/Code.gs`):
@@ -92,7 +137,9 @@ export function writeReportRowsToSheet(
 
     const valuesMatrix: unknown[][] = [
       SCHEMA_COLUMN_NAMES,
-      ...toSheetValueMatrix(SCHEMA_COLUMN_NAMES, effectiveRows),
+      ...toSheetValueMatrix(SCHEMA_COLUMN_NAMES, effectiveRows).map((row) =>
+        row.map((cell) => (typeof cell === 'string' ? truncateForSheetCell(cell) : cell))
+      ),
     ];
 
     writeMatrixInChunks(sheet, 1, 1, valuesMatrix, SHEET_WRITE_CHUNK_ROWS);

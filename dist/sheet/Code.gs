@@ -1449,96 +1449,6 @@ var DlgSheetBundle = (() => {
     return Math.round((val * rate + Number.EPSILON) * 100) / 100;
   }
 
-  // src/shared/utils/base64.ts
-  var BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  var BASE64_LOOKUP = (() => {
-    const lookup = { "-": 62, "_": 63 };
-    for (let i = 0; i < BASE64_ALPHABET.length; i++) {
-      lookup[BASE64_ALPHABET[i]] = i;
-    }
-    return lookup;
-  })();
-  function decodeBase64ToAscii(input) {
-    if (typeof input !== "string")
-      return null;
-    const data = input.replace(/={1,2}$/, "");
-    if (data.length % 4 === 1)
-      return null;
-    if (data.length !== input.length && input.length % 4 !== 0)
-      return null;
-    let out = "";
-    let buffer = 0;
-    let bits = 0;
-    for (let i = 0; i < data.length; i++) {
-      const ch = data[i];
-      if (!Object.prototype.hasOwnProperty.call(BASE64_LOOKUP, ch))
-        return null;
-      buffer = buffer << 6 | BASE64_LOOKUP[ch];
-      bits += 6;
-      if (bits >= 8) {
-        bits -= 8;
-        const byte = buffer >> bits & 255;
-        buffer &= (1 << bits) - 1;
-        if (byte < 32 || byte > 126)
-          return null;
-        out += String.fromCharCode(byte);
-      }
-    }
-    return out;
-  }
-
-  // src/appscript/processors/ads-ui-urls.ts
-  var ADS_UI_BASE_URL = "https://ads.google.com/aw";
-  function parseRecommendationIdInfo(recommendationId) {
-    if (!recommendationId)
-      return null;
-    const encoded = String(recommendationId).split("/").pop()?.trim() ?? "";
-    if (!encoded)
-      return null;
-    const decoded = decodeBase64ToAscii(encoded);
-    if (!decoded)
-      return null;
-    const [ocid, recoTypeId] = decoded.split("-");
-    if (!/^\d+$/.test(ocid ?? "") || /^0+$/.test(ocid) || !/^\d+$/.test(recoTypeId ?? ""))
-      return null;
-    return { ocid, recoTypeId };
-  }
-  function resolveAdsUiOcid(recommendationId, fallbackCid) {
-    return parseRecommendationIdInfo(recommendationId)?.ocid ?? normalizeCid(fallbackCid);
-  }
-  function buildRecommendationsDetailsUrl(recommendationId, accountCid) {
-    const info = parseRecommendationIdInfo(recommendationId);
-    if (!info)
-      return `${ADS_UI_BASE_URL}/recommendations?ocid=${normalizeCid(accountCid)}`;
-    return `${ADS_UI_BASE_URL}/recommendations?ocid=${info.ocid}&opp=${info.recoTypeId}`;
-  }
-  function buildCampaignUrl(campaignId, recommendationId, accountCid) {
-    return `${ADS_UI_BASE_URL}/overview?campaignId=${campaignId}&ocid=${resolveAdsUiOcid(recommendationId, accountCid)}`;
-  }
-
-  // src/appscript/processors/entity-keys.ts
-  function extractResourceTrailingId(resourceName, collectionName) {
-    if (!resourceName || resourceName === "N/A")
-      return "";
-    const marker = `/${collectionName}/`;
-    const idx = resourceName.indexOf(marker);
-    if (idx === -1)
-      return "";
-    return resourceName.slice(idx + marker.length).trim();
-  }
-  function getPortfolioOwnerCid(row) {
-    return normalizeCid(row.portfolioOwnerId) || normalizeCid(row.accountId);
-  }
-  function getPortfolioEntityKey(row) {
-    const strategyId = extractResourceTrailingId(row.portfolioStrategyResourceName, "biddingStrategies");
-    return `${getPortfolioOwnerCid(row)}::${strategyId || row.portfolioStrategyResourceName || ""}`;
-  }
-  function getPortfolioGroupKey(row, perAccount = false) {
-    const recId = extractResourceTrailingId(row.recommendationId, "recommendations") || String(row.recommendationId ?? "").split("/").pop() || "";
-    const key = `${getPortfolioEntityKey(row)}::${recId}::${row.currencyCode}`;
-    return perAccount ? `${key}::${normalizeCid(row.accountId)}` : key;
-  }
-
   // src/shared/schema.ts
   var REPORT_SCHEMA_TEMPLATE = {
     // --- Ranking, Scope & Multi-MCC Metadata ---
@@ -1806,6 +1716,261 @@ var DlgSheetBundle = (() => {
     return row;
   }
 
+  // src/appscript/sheets/data-writer.ts
+  var DATA_SHEET_NAME = "Data";
+  var MAX_SHEET_CELL_CHARS = 5e4;
+  function truncateForSheetCell(val, maxChars = MAX_SHEET_CELL_CHARS) {
+    if (val.length <= maxChars)
+      return val;
+    return maxChars > 0 ? `${val.slice(0, maxChars - 1)}\u2026` : "";
+  }
+  function joinListForSheetCell(items, maxChars = MAX_SHEET_CELL_CHARS - 1) {
+    const full = items.join(", ");
+    if (full.length <= maxChars)
+      return full;
+    let current = "";
+    let included = 0;
+    for (let i = 0; i < items.length; i++) {
+      const remaining = items.length - (i + 1);
+      const suffix = remaining > 0 ? `, ... (+${remaining} more)` : "";
+      const candidate = i === 0 ? items[0] : `${current}, ${items[i]}`;
+      if (candidate.length + suffix.length <= maxChars) {
+        current = candidate;
+        included = i + 1;
+      } else {
+        break;
+      }
+    }
+    return included > 0 ? `${current}, ... (+${items.length - included} more)` : truncateForSheetCell(items[0], maxChars);
+  }
+  function writeReportRowsToSheet(sheet, rows, workbook) {
+    const runWrite = () => {
+      const effectiveRows = [
+        createDummyFormattingRow(),
+        ...rows.filter((r) => !isDummyFormattingRow(r))
+      ];
+      const numCols = SCHEMA_COLUMN_NAMES.length;
+      const totalSheetRows = effectiveRows.length + 1;
+      const currentMaxCols = sheet.getMaxColumns();
+      if (currentMaxCols < numCols) {
+        sheet.insertColumnsAfter(currentMaxCols, numCols - currentMaxCols);
+      }
+      const currentMaxRows = sheet.getMaxRows();
+      if (currentMaxRows < totalSheetRows) {
+        sheet.insertRowsAfter(currentMaxRows, totalSheetRows - currentMaxRows);
+      }
+      const singleRowFormats = SCHEMA_COLUMN_NAMES.map(
+        (colKey) => REPORT_SCHEMA_TEMPLATE[colKey].format
+      );
+      writeFormatsInChunks(
+        sheet,
+        2,
+        1,
+        effectiveRows.length,
+        singleRowFormats,
+        SHEET_WRITE_CHUNK_ROWS
+      );
+      const valuesMatrix = [
+        SCHEMA_COLUMN_NAMES,
+        ...toSheetValueMatrix(SCHEMA_COLUMN_NAMES, effectiveRows).map(
+          (row) => row.map((cell) => typeof cell === "string" ? truncateForSheetCell(cell) : cell)
+        )
+      ];
+      writeMatrixInChunks(sheet, 1, 1, valuesMatrix, SHEET_WRITE_CHUNK_ROWS);
+      trimSheetGrid(sheet, totalSheetRows, numCols);
+    };
+    if (workbook) {
+      withSheetLock(workbook, "DATA_WRITE", runWrite);
+    } else {
+      runWrite();
+    }
+  }
+  function readReportRowsFromSheet(sheet, timeZone = resolveDefaultTimeZone()) {
+    if (!sheet)
+      return [];
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2)
+      return [];
+    const numCols = sheet.getMaxColumns();
+    if (numCols < 1)
+      return [];
+    const allValues = sheet.getRange(1, 1, lastRow, numCols).getValues();
+    const headerRow = allValues[0] ?? [];
+    const colIndexByKey = /* @__PURE__ */ new Map();
+    for (let c = 0; c < headerRow.length; c++) {
+      const headerName = String(headerRow[c] ?? "").trim();
+      if (headerName && !colIndexByKey.has(headerName)) {
+        colIndexByKey.set(headerName, c);
+      }
+    }
+    const out = [];
+    for (let r = 1; r < allValues.length; r++) {
+      const rawRow = allValues[r];
+      const obj = {};
+      for (const key of SCHEMA_COLUMN_NAMES) {
+        const colIdx = colIndexByKey.get(key);
+        const cellVal = colIdx === void 0 ? void 0 : rawRow[colIdx];
+        obj[key] = coerceReportCell(key, cellVal, timeZone);
+      }
+      const typed = obj;
+      if (isDummyFormattingRow(typed)) {
+        continue;
+      }
+      out.push(typed);
+    }
+    return out;
+  }
+  function coerceReportCell(key, cellVal, timeZone) {
+    const def = REPORT_SCHEMA_TEMPLATE[key];
+    if (cellVal === "" || cellVal === null || cellVal === void 0) {
+      return def.defaultValue;
+    }
+    if (typeof def.defaultValue === "boolean") {
+      return parseSheetBoolean(cellVal);
+    }
+    if (isDateFormat(def.format)) {
+      return coerceDateCell(cellVal, def.format, def.defaultValue, timeZone);
+    }
+    if (def.format === "@") {
+      if (cellVal instanceof Date) {
+        return cellVal.toISOString().replace("T", " ").slice(0, 19);
+      }
+      return unescapeFormulaString(String(cellVal));
+    }
+    const num = Number(cellVal);
+    return Number.isFinite(num) ? num : def.defaultValue;
+  }
+  var MIN_EPOCH_MS = 1e11;
+  function isDateFormat(format) {
+    return format.startsWith("yyyy");
+  }
+  function coerceDateCell(cellVal, format, defaultValue, timeZone) {
+    const pattern = format.includes("hh") ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd";
+    if (cellVal instanceof Date) {
+      return formatDateInTimeZone(cellVal, timeZone, pattern) ?? defaultValue;
+    }
+    if (typeof cellVal === "number") {
+      if (Number.isFinite(cellVal) && cellVal > MIN_EPOCH_MS) {
+        return formatDateInTimeZone(new Date(cellVal), timeZone, pattern) ?? defaultValue;
+      }
+      return defaultValue;
+    }
+    return String(cellVal);
+  }
+  function formatDateInTimeZone(date, timeZone, pattern) {
+    if (Number.isNaN(date.getTime()))
+      return null;
+    if (typeof Utilities !== "undefined" && typeof Utilities.formatDate === "function") {
+      return Utilities.formatDate(date, timeZone || "UTC", pattern);
+    }
+    const iso = date.toISOString().replace("T", " ");
+    return pattern === "yyyy-MM-dd" ? iso.slice(0, 10) : iso.slice(0, 19);
+  }
+  function resolveDefaultTimeZone() {
+    if (typeof Session !== "undefined" && typeof Session.getScriptTimeZone === "function") {
+      return Session.getScriptTimeZone() || "UTC";
+    }
+    return "UTC";
+  }
+  function writeFormatsInChunks(sheet, startRow, startCol, totalDataRows, singleRowFormats, chunkRows) {
+    const numCols = singleRowFormats.length;
+    for (let offset = 0; offset < totalDataRows; offset += chunkRows) {
+      const count = Math.min(chunkRows, totalDataRows - offset);
+      const formatsSlice = Array.from({ length: count }, () => [...singleRowFormats]);
+      sheet.getRange(startRow + offset, startCol, count, numCols).setNumberFormats(formatsSlice);
+    }
+  }
+
+  // src/shared/utils/base64.ts
+  var BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var BASE64_LOOKUP = (() => {
+    const lookup = { "-": 62, "_": 63 };
+    for (let i = 0; i < BASE64_ALPHABET.length; i++) {
+      lookup[BASE64_ALPHABET[i]] = i;
+    }
+    return lookup;
+  })();
+  function decodeBase64ToAscii(input) {
+    if (typeof input !== "string")
+      return null;
+    const data = input.replace(/={1,2}$/, "");
+    if (data.length % 4 === 1)
+      return null;
+    if (data.length !== input.length && input.length % 4 !== 0)
+      return null;
+    let out = "";
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < data.length; i++) {
+      const ch = data[i];
+      if (!Object.prototype.hasOwnProperty.call(BASE64_LOOKUP, ch))
+        return null;
+      buffer = buffer << 6 | BASE64_LOOKUP[ch];
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        const byte = buffer >> bits & 255;
+        buffer &= (1 << bits) - 1;
+        if (byte < 32 || byte > 126)
+          return null;
+        out += String.fromCharCode(byte);
+      }
+    }
+    return out;
+  }
+
+  // src/appscript/processors/ads-ui-urls.ts
+  var ADS_UI_BASE_URL = "https://ads.google.com/aw";
+  function parseRecommendationIdInfo(recommendationId) {
+    if (!recommendationId)
+      return null;
+    const encoded = String(recommendationId).split("/").pop()?.trim() ?? "";
+    if (!encoded)
+      return null;
+    const decoded = decodeBase64ToAscii(encoded);
+    if (!decoded)
+      return null;
+    const [ocid, recoTypeId] = decoded.split("-");
+    if (!/^\d+$/.test(ocid ?? "") || /^0+$/.test(ocid) || !/^\d+$/.test(recoTypeId ?? ""))
+      return null;
+    return { ocid, recoTypeId };
+  }
+  function resolveAdsUiOcid(recommendationId, fallbackCid) {
+    return parseRecommendationIdInfo(recommendationId)?.ocid ?? normalizeCid(fallbackCid);
+  }
+  function buildRecommendationsDetailsUrl(recommendationId, accountCid) {
+    const info = parseRecommendationIdInfo(recommendationId);
+    if (!info)
+      return `${ADS_UI_BASE_URL}/recommendations?ocid=${normalizeCid(accountCid)}`;
+    return `${ADS_UI_BASE_URL}/recommendations?ocid=${info.ocid}&opp=${info.recoTypeId}`;
+  }
+  function buildCampaignUrl(campaignId, recommendationId, accountCid) {
+    return `${ADS_UI_BASE_URL}/overview?campaignId=${campaignId}&ocid=${resolveAdsUiOcid(recommendationId, accountCid)}`;
+  }
+
+  // src/appscript/processors/entity-keys.ts
+  function extractResourceTrailingId(resourceName, collectionName) {
+    if (!resourceName || resourceName === "N/A")
+      return "";
+    const marker = `/${collectionName}/`;
+    const idx = resourceName.indexOf(marker);
+    if (idx === -1)
+      return "";
+    return resourceName.slice(idx + marker.length).trim();
+  }
+  function getPortfolioOwnerCid(row) {
+    return normalizeCid(row.portfolioOwnerId) || normalizeCid(row.accountId);
+  }
+  function getPortfolioEntityKey(row) {
+    const strategyId = extractResourceTrailingId(row.portfolioStrategyResourceName, "biddingStrategies");
+    return `${getPortfolioOwnerCid(row)}::${strategyId || row.portfolioStrategyResourceName || ""}`;
+  }
+  function getPortfolioGroupKey(row, perAccount = false) {
+    const recId = extractResourceTrailingId(row.recommendationId, "recommendations") || String(row.recommendationId ?? "").split("/").pop() || "";
+    const key = `${getPortfolioEntityKey(row)}::${recId}::${row.currencyCode}`;
+    return perAccount ? `${key}::${normalizeCid(row.accountId)}` : key;
+  }
+
   // src/appscript/processors/joiner.ts
   function joinStagingBatchToReportRows(batch) {
     const accountMap = /* @__PURE__ */ new Map();
@@ -2006,7 +2171,7 @@ var DlgSheetBundle = (() => {
     base.recommendationScope = scope;
     const memberNames = members.map((m) => m.campaignName);
     base.portfolioCampaignsCount = members.length;
-    base.portfolioMemberCampaignNames = memberNames.join(", ");
+    base.portfolioMemberCampaignNames = joinListForSheetCell(memberNames);
     if (scope === "PORTFOLIO") {
       base.campaignName = base.campaignPortfolioBiddingStrategyName || base.campaignName;
       const strategyId = extractResourceTrailingId(base.portfolioStrategyResourceName, "biddingStrategies");
@@ -2111,144 +2276,6 @@ var DlgSheetBundle = (() => {
       return `SHARED_BUDGET::${row.accountId}::${budgetKey}`;
     }
     return `CAMPAIGN::${row.accountId}::${row.campaignId}`;
-  }
-
-  // src/appscript/sheets/data-writer.ts
-  var DATA_SHEET_NAME = "Data";
-  function writeReportRowsToSheet(sheet, rows, workbook) {
-    const runWrite = () => {
-      const effectiveRows = [
-        createDummyFormattingRow(),
-        ...rows.filter((r) => !isDummyFormattingRow(r))
-      ];
-      const numCols = SCHEMA_COLUMN_NAMES.length;
-      const totalSheetRows = effectiveRows.length + 1;
-      const currentMaxCols = sheet.getMaxColumns();
-      if (currentMaxCols < numCols) {
-        sheet.insertColumnsAfter(currentMaxCols, numCols - currentMaxCols);
-      }
-      const currentMaxRows = sheet.getMaxRows();
-      if (currentMaxRows < totalSheetRows) {
-        sheet.insertRowsAfter(currentMaxRows, totalSheetRows - currentMaxRows);
-      }
-      const singleRowFormats = SCHEMA_COLUMN_NAMES.map(
-        (colKey) => REPORT_SCHEMA_TEMPLATE[colKey].format
-      );
-      writeFormatsInChunks(
-        sheet,
-        2,
-        1,
-        effectiveRows.length,
-        singleRowFormats,
-        SHEET_WRITE_CHUNK_ROWS
-      );
-      const valuesMatrix = [
-        SCHEMA_COLUMN_NAMES,
-        ...toSheetValueMatrix(SCHEMA_COLUMN_NAMES, effectiveRows)
-      ];
-      writeMatrixInChunks(sheet, 1, 1, valuesMatrix, SHEET_WRITE_CHUNK_ROWS);
-      trimSheetGrid(sheet, totalSheetRows, numCols);
-    };
-    if (workbook) {
-      withSheetLock(workbook, "DATA_WRITE", runWrite);
-    } else {
-      runWrite();
-    }
-  }
-  function readReportRowsFromSheet(sheet, timeZone = resolveDefaultTimeZone()) {
-    if (!sheet)
-      return [];
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2)
-      return [];
-    const numCols = sheet.getMaxColumns();
-    if (numCols < 1)
-      return [];
-    const allValues = sheet.getRange(1, 1, lastRow, numCols).getValues();
-    const headerRow = allValues[0] ?? [];
-    const colIndexByKey = /* @__PURE__ */ new Map();
-    for (let c = 0; c < headerRow.length; c++) {
-      const headerName = String(headerRow[c] ?? "").trim();
-      if (headerName && !colIndexByKey.has(headerName)) {
-        colIndexByKey.set(headerName, c);
-      }
-    }
-    const out = [];
-    for (let r = 1; r < allValues.length; r++) {
-      const rawRow = allValues[r];
-      const obj = {};
-      for (const key of SCHEMA_COLUMN_NAMES) {
-        const colIdx = colIndexByKey.get(key);
-        const cellVal = colIdx === void 0 ? void 0 : rawRow[colIdx];
-        obj[key] = coerceReportCell(key, cellVal, timeZone);
-      }
-      const typed = obj;
-      if (isDummyFormattingRow(typed)) {
-        continue;
-      }
-      out.push(typed);
-    }
-    return out;
-  }
-  function coerceReportCell(key, cellVal, timeZone) {
-    const def = REPORT_SCHEMA_TEMPLATE[key];
-    if (cellVal === "" || cellVal === null || cellVal === void 0) {
-      return def.defaultValue;
-    }
-    if (typeof def.defaultValue === "boolean") {
-      return parseSheetBoolean(cellVal);
-    }
-    if (isDateFormat(def.format)) {
-      return coerceDateCell(cellVal, def.format, def.defaultValue, timeZone);
-    }
-    if (def.format === "@") {
-      if (cellVal instanceof Date) {
-        return cellVal.toISOString().replace("T", " ").slice(0, 19);
-      }
-      return unescapeFormulaString(String(cellVal));
-    }
-    const num = Number(cellVal);
-    return Number.isFinite(num) ? num : def.defaultValue;
-  }
-  var MIN_EPOCH_MS = 1e11;
-  function isDateFormat(format) {
-    return format.startsWith("yyyy");
-  }
-  function coerceDateCell(cellVal, format, defaultValue, timeZone) {
-    const pattern = format.includes("hh") ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd";
-    if (cellVal instanceof Date) {
-      return formatDateInTimeZone(cellVal, timeZone, pattern) ?? defaultValue;
-    }
-    if (typeof cellVal === "number") {
-      if (Number.isFinite(cellVal) && cellVal > MIN_EPOCH_MS) {
-        return formatDateInTimeZone(new Date(cellVal), timeZone, pattern) ?? defaultValue;
-      }
-      return defaultValue;
-    }
-    return String(cellVal);
-  }
-  function formatDateInTimeZone(date, timeZone, pattern) {
-    if (Number.isNaN(date.getTime()))
-      return null;
-    if (typeof Utilities !== "undefined" && typeof Utilities.formatDate === "function") {
-      return Utilities.formatDate(date, timeZone || "UTC", pattern);
-    }
-    const iso = date.toISOString().replace("T", " ");
-    return pattern === "yyyy-MM-dd" ? iso.slice(0, 10) : iso.slice(0, 19);
-  }
-  function resolveDefaultTimeZone() {
-    if (typeof Session !== "undefined" && typeof Session.getScriptTimeZone === "function") {
-      return Session.getScriptTimeZone() || "UTC";
-    }
-    return "UTC";
-  }
-  function writeFormatsInChunks(sheet, startRow, startCol, totalDataRows, singleRowFormats, chunkRows) {
-    const numCols = singleRowFormats.length;
-    for (let offset = 0; offset < totalDataRows; offset += chunkRows) {
-      const count = Math.min(chunkRows, totalDataRows - offset);
-      const formatsSlice = Array.from({ length: count }, () => [...singleRowFormats]);
-      sheet.getRange(startRow + offset, startCol, count, numCols).setNumberFormats(formatsSlice);
-    }
   }
 
   // src/appscript/publisher.ts

@@ -22,6 +22,7 @@
 
 import type {ReportRow} from '../../shared/types';
 import {normalizeCid} from '../../shared/utils/cid';
+import {joinListForSheetCell} from '../sheets/data-writer';
 import {resolveAdsUiOcid} from './ads-ui-urls';
 import {extractResourceTrailingId, getPortfolioGroupKey, getPortfolioOwnerCid} from './entity-keys';
 import {populateDerivedRowMetrics} from './joiner';
@@ -117,7 +118,7 @@ function mergeGroupRows(
   base.recommendationScope = scope;
   const memberNames = members.map((m) => m.campaignName);
   base.portfolioCampaignsCount = members.length;
-  base.portfolioMemberCampaignNames = memberNames.join(', ');
+  base.portfolioMemberCampaignNames = joinListForSheetCell(memberNames);
 
   if (scope === 'PORTFOLIO') {
     base.campaignName = base.campaignPortfolioBiddingStrategyName || base.campaignName;
